@@ -6,3 +6,5 @@ data/
 results/*/ckpt_*.pt
 *.log
 .python-version
+results/*.pt
+results/**/*.pt

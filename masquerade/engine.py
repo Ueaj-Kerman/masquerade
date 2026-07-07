@@ -119,6 +119,7 @@ class Engine:
         # cache already has 0..L-2 = 0..len-1. ✓
         self.tokens.scatter_(1, lens[:, None], nxt[:, None])
         self.L = lens + 1
+        self.prompt_lens = lens.clone()
         self.n_forwards += 1
 
     # ---------------- spec round ----------------
@@ -264,8 +265,8 @@ class Engine:
         self.acc_hist.zero_(); self.pos_reach.zero_(); self.pos_accept.zero_()
         self.n_rounds = 0; self.n_forwards = 0
         self.prefill(prompts)
-        start_L = self.L.clone()
-        limit = self.L + max_new
+        start_L = self.prompt_lens  # first generated token sits at prompt_len
+        limit = start_L + max_new
         torch.cuda.synchronize()
         import time
         t0 = time.perf_counter()

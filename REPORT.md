@@ -51,9 +51,22 @@ Key finding: pure live self-distillation trades base quality for acceptance;
 
 The NTP anchor prevents outright collapse (3e-4 arm keeps τ~5.5 instead of
 degenerate 9.0) and buys acceptance at fixed quality for 3e-5 (τ gsm8k
-4.67→5.08 vs sweep-1 at same 43.8% GSM8K). Fused 0.6B τ within ~10% of
-DSpark's dedicated-1B-drafter-on-4B τ, at 1000 training steps.
-Final runs (3000 steps + Markov head r=256): lr 3e-5 and 1e-5, pending.
+4.67→5.08 vs sweep-1 at same 43.8% GSM8K).
+NOTE: these two sweeps ran BEFORE the teacher stop-grad fix (see below) —
+kept as the ablation of the leak.
+
+## FINAL 0.6B (stop-grad fix + Markov r=256 + 3000 steps, live, w_ntp 0.1)
+
+| lr | GSM8K (base 62.5%) | τ gsm8k | τ chat | τ code |
+|---|---|---|---|---|
+| **1e-5** | **62.5% — zero degradation** | **5.27** | 3.38 | 4.29 |
+| 3e-5 | 48.4% | 5.66 | 3.54 | 4.68 |
+| 1e-4 | 28.9% | 5.74 | 4.91 | 5.44 |
+
+Headline: a fused self-drafter (no separate model; one embedding row + rank-256
+Markov head) reaches τ 5.27 on GSM8K at UNCHANGED base accuracy — 93% of
+DSpark's dedicated-1B-drafter τ (5.64) measured on Qwen3-4B, from a 0.6B model
+and ~1.5h of H100 training. The lr dial traces a quality/acceptance pareto.
 
 ## Stage 1: frozen-teacher, single region (0.6B local)
 
