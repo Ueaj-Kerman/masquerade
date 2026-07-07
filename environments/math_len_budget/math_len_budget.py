@@ -14,14 +14,20 @@ from datasets import load_dataset
 from verifiers.rubrics.math_rubric import MathRubric
 from verifiers.utils.data_utils import extract_boxed_answer
 
+SYSTEM_PROMPT = (
+    "You are being evaluated on both correctness and response length: this "
+    "environment penalizes every generated token, including reasoning. The "
+    "user's instructions state how strict the length penalty is for their "
+    "request; calibrate how deeply you reason accordingly."
+)
 BUDGETS = {
     "strict": dict(lam=0.20, phrases=[
-        "Answer as efficiently as possible; every token counts.",
-        "Be concise - give the shortest correct solution.",
+        "Strict length penalty: answer as efficiently as possible; every token counts.",
+        "Be terse - shortest correct solution wins.",
         ""]),  # unmarked prompts are also strict (the default behavior)
     "lax": dict(lam=0.02, phrases=[
-        "This is extremely important - think as hard and as long as you need.",
-        "Take all the space you need; thoroughness matters far more than brevity."]),
+        "Length penalty is relaxed for this one - it is extremely important, so think as hard and as long as you need.",
+        "Take all the space you need; thoroughness matters far more than brevity here."]),
 }
 INSTR = "Solve the following math problem. Put the final answer in \\boxed{}."
 
@@ -60,4 +66,4 @@ def load_environment(dataset_name="PrimeIntellect/Hendrycks-Math", dataset_subse
     rubric.add_reward_func(length_penalty, weight=1.0)
     rubric.add_metric(completion_tokens)
     rubric.add_metric(budget_is_lax)
-    return vf.SingleTurnEnv(dataset=build_dataset, rubric=rubric, system_prompt=None)
+    return vf.SingleTurnEnv(dataset=build_dataset, rubric=rubric, system_prompt=SYSTEM_PROMPT)

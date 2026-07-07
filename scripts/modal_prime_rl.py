@@ -25,7 +25,7 @@ res_vol = modal.Volume.from_name("masquerade-results", create_if_missing=True)
 hf_cache = modal.Volume.from_name("masquerade-hf-cache", create_if_missing=True)
 
 
-@app.function(image=image, gpu="H100:2", timeout=60 * 60 * 12,
+@app.function(image=image, gpu="H100:4", timeout=60 * 60 * 12,
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": res_vol, "/root/.cache/huggingface": hf_cache})
 def train(smoke: bool = False):

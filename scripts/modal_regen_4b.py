@@ -20,7 +20,8 @@ hf_cache = modal.Volume.from_name("masquerade-hf-cache", create_if_missing=True)
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 4,
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/data": data_vol, "/root/.cache/huggingface": hf_cache})
-def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl"):
+def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl",
+          thinking: bool = False):
     from datasets import load_dataset
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
@@ -36,7 +37,7 @@ def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_
         if len(text) > 4000:
             continue
         templ = tok.apply_chat_template([{"role": "user", "content": text}], tokenize=False,
-                                        add_generation_prompt=True, enable_thinking=False)
+                                        add_generation_prompt=True, enable_thinking=thinking)
         if len(tok(templ, add_special_tokens=False)["input_ids"]) > 1400:
             continue
         raw.append(text)
@@ -61,5 +62,6 @@ def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_
 
 
 @app.local_entrypoint()
-def main(n: int = 80_000):
-    print("wrote:", regen.remote(n))
+def main(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl",
+         thinking: bool = False):
+    print("wrote:", regen.remote(n, max_tokens, out, thinking))
