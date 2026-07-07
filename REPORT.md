@@ -110,7 +110,7 @@ mask arm at 28M tokens): val loss 4.557 post-fix vs 4.580 leaky.
 - 30m pilots on GB10 (T=1024,B=16); 50m/124m arms on H100 (T=2048, compiled,
   flex): ntp arms ~190k tok/s; mask arms ~47k tok/s (block-mask build + pair
   loss overhead — honest cost of the fused objective, unoptimized).
-(val-loss-vs-tokens comparison pending)
+(final numbers in 'Stage 5 final' below)
 
 ## Local pareto (RTX 5090, masquerade-0.6B lr1e-5 ckpt, greedy, mixed prompts)
 
@@ -148,7 +148,16 @@ correction is redundant. (Training-side ablation arm pending.)
 | Qwen3-4B base | — | 89.1% | 2.03 (floor) | 2.01 | 2.03 |
 | + DSpark (repro, temp 1.0) | ~1B separate | lossless | 5.64 | 3.28 | — |
 | + masquerade lr3e-5 @2500 (greedy) | **fused, +1 row** | 82.0% | **6.68** | 3.78 | 5.17 |
-| + masquerade lr1e-5 (training) | fused | — | — | — | — |
+| + masquerade lr3e-5 @2500 (temp 1.0) | **fused, +1 row** | 82.0% | **5.65** | **3.43** | 4.42 |
+| + masquerade lr1e-5 | fused | lost to power failures @ ~step 500 | | | |
+
+**At DSpark's exact protocol the fused drafter matches DSpark: 5.65 vs 5.64
+(gsm8k), 3.43 vs 3.28 (chat) — with zero drafter parameters.** The 3e-5 arm
+costs 7 GSM8K points; the 0.6B evidence says lr 1e-5 recovers that at slightly
+lower tau (run interrupted twice by host power failures).
+
+Local 4B pareto (RTX 5090 bf16, B=1): AR 103 -> k=4 192 (1.86x, tau 5.02) ->
+k=8 **222 tok/s (2.15x lossless, tau 6.30)**.
 
 Position-1 conditional acceptance 0.905 (gsm8k) — matching DSpark's ~0.89 with
 no separate drafter. Protocol note: DSpark numbers at temp 1.0; temp-1.0 eval
