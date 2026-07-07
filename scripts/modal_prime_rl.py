@@ -33,7 +33,8 @@ def train(smoke: bool = False):
     import subprocess
 
     uv = "/root/.local/bin/uv"
-    subprocess.run([uv, "pip", "install", "-e", "/env/math_len_budget"],
+    subprocess.run([uv, "pip", "install", "-e", "/env/math_len_budget",
+                    "--python", "/prime-rl/.venv/bin/python"],
                    cwd="/prime-rl", check=True)
     cfg = open("/cfg/selfrun_rl.toml").read()
     if smoke:
