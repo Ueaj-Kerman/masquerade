@@ -8,3 +8,6 @@ results/*/ckpt_*.pt
 .python-version
 results/*.pt
 results/**/*.pt
+third_party/
+.venv-vllm/
+*.pt
