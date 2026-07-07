@@ -172,7 +172,8 @@ def run_cp_demo():
 
 @app.local_entrypoint()
 def final06b(steps: int = 3000):
-    arms = [("3e-5", "0.1"), ("1e-5", "0.1")]
+    # post stop-grad fix: probe whether higher LR is now safe
+    arms = [("3e-5", "0.1"), ("1e-5", "0.1"), ("1e-4", "0.1")]
     argvs = [
         f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "
         f"--out-dir /results/final06b_lr{lr} --steps {steps} --batch-size 8 "

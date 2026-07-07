@@ -142,8 +142,12 @@ def run(args):
         ht = (h_teacher if h_teacher is not None else h_student).gather(1, ti).detach()
         with torch.autocast(device, torch.bfloat16, enabled=device == "cuda"):
             sl = student.lm_head(hs).float()
-            tm = teacher if args.teacher == "frozen" else student
-            tl = tm.lm_head(ht).float()
+            # teacher logits FULLY stop-grad: detached hidden is not enough —
+            # lm_head is tied to embeddings, so grads would leak into the
+            # teacher stream and let the model self-simplify.
+            with torch.no_grad():
+                tm = teacher if args.teacher == "frozen" else student
+                tl = tm.lm_head(ht).float()
         if markov is not None:
             prev = batch.ids.to(device).gather(1, batch.teacher_idx.to(device))
             sl = sl + markov["w2"](markov["w1"](prev)).float()

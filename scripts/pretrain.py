@@ -291,7 +291,8 @@ def main():
             ht = h.gather(1, pb.teacher_idx.cuda()[..., None].expand(-1, -1, E)).detach()
             with torch.autocast("cuda", torch.bfloat16):
                 sl = model.lm_head(hs).float()
-                tl = model.lm_head(ht).float()
+                with torch.no_grad():  # full teacher stop-grad (tied lm_head)
+                    tl = model.lm_head(ht).float()
             pw = pb.pair_w.cuda(); den = pw.sum().clamp(min=1e-6)
             tv = (0.5 * (tl.softmax(-1) - sl.softmax(-1)).abs().sum(-1) * pw).sum() / den
             pce = (F.cross_entropy(sl.flatten(0, 1), pb.hard_labels.cuda().flatten(),
