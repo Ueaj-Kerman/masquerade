@@ -17,7 +17,7 @@ image = (
                    ignore=[".git", ".venv", "wandb", "outputs", "logs",
                            "**/__pycache__", "**/*.pt", "**/*.safetensors"])
     .run_commands(
-        "cd /prime-rl && /root/.local/bin/uv sync --no-dev --extra flash-attn",
+        "cd /prime-rl && /root/.local/bin/uv sync --frozen --no-dev --extra flash-attn",
         "ls /prime-rl/.venv/bin | grep -cE 'rl|orchestrator' && "
         "/prime-rl/.venv/bin/python -c 'import flash_attn' && echo VENVOK",
     )

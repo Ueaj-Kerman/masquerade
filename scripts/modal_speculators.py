@@ -20,7 +20,7 @@ image = (
         "cd /speculators && /root/.local/bin/uv venv .venv && "
         "/root/.local/bin/uv pip install --python .venv/bin/python -e . 2>&1 | tail -2",
         "/root/.local/bin/uv venv /vllm_venv && "
-        "/root/.local/bin/uv pip install --python /vllm_venv/bin/python 'vllm>=0.19.1,<=0.24.0' 2>&1 | tail -2",
+        "/root/.local/bin/uv pip install --python /vllm_venv/bin/python 'vllm>=0.19.1,<=0.24.0' ninja 2>&1 | tail -2",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "0"})
 )
@@ -66,7 +66,8 @@ def train(data: str = "/data/regen_qwen3_4b_think.jsonl", epochs: int = 3,
          "--port", "8000", "--gpu-memory-utilization", "0.9",
          "--disable-uvicorn-access-log"],
         cwd="/speculators", env={"CUDA_VISIBLE_DEVICES": "0",
-                                 "PATH": "/usr/local/bin:/usr/bin:/bin",
+                                 "VLLM_USE_FLASHINFER_SAMPLER": "0",
+                                 "PATH": "/vllm_venv/bin:/usr/local/bin:/usr/bin:/bin",
                                  "HOME": "/root"})
     for _ in range(120):
         try:
