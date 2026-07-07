@@ -142,6 +142,18 @@ def stage5(arms: str = "50m:ntp:15000,50m:ntp+mask:15000,124m:ntp:11500,124m:ntp
 
 
 @app.local_entrypoint()
+def stage5_wtv(steps: int = 15000):
+    argvs = [
+        f"--preset 50m --objective ntp+mask --optimizer aurora --steps {steps} "
+        f"--batch-size 32 --T 2048 --compile --attn flex --data /data/fineweb "
+        f"--w-tv {w} --out-dir /results/pretrain/50m_mask_wtv{w} --eval-every 250"
+        for w in ("0.1", "0.4")
+    ]
+    for rc in pretrain.map(argvs):
+        print("exit:", rc)
+
+
+@app.local_entrypoint()
 def sweep2(steps: int = 1000):
     arms = [("3e-5", "0.1"), ("1e-4", "0.2"), ("1e-4", "0.5"), ("3e-4", "0.5")]
     argvs = [

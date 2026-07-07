@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--include-base", action="store_true")
     ap.add_argument("--only-step", type=int, default=None)
     ap.add_argument("--no-gsm", action="store_true")
+    ap.add_argument("--compile", default="none")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -56,12 +57,15 @@ def main():
         if step in done_steps:
             print(f"skip step {step} (done)")
             continue
+        cm = None if args.compile == "none" else args.compile
         m, markov = load_ckpt(args.model_dir, ck)
         rec = {"step": step}
         rec["acceptance"] = bench_acceptance(m, tok, k=args.k, n_prompts=args.n_prompts,
-                                             max_new=args.max_new, markov=markov)
+                                             max_new=args.max_new, markov=markov,
+                                             compile_mode=cm)
         if not args.no_gsm:
-            rec.update(gsm8k_accuracy(m, tok, n=args.gsm_n, markov=markov))
+            rec.update(gsm8k_accuracy(m, tok, n=args.gsm_n, markov=markov,
+                                      compile_mode=cm))
         print(json.dumps(rec, indent=None), flush=True)
         with out_path.open("a") as f:
             f.write(json.dumps(rec) + "\n")
