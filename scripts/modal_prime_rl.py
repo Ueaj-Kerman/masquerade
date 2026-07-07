@@ -33,9 +33,11 @@ def train(smoke: bool = False):
     import subprocess
 
     uv = "/root/.local/bin/uv"
-    subprocess.run([uv, "pip", "install", "-e", "/env/math_len_budget",
-                    "--python", "/prime-rl/.venv/bin/python"],
-                   cwd="/prime-rl", check=True)
+    py = "/prime-rl/.venv/bin/python"
+    subprocess.run([uv, "pip", "install", "--python", py, "math-verify"],
+                   cwd="/prime-rl", check=False)
+    subprocess.run([uv, "pip", "install", "--no-deps", "--python", py,
+                    "-e", "/env/math_len_budget"], cwd="/prime-rl", check=True)
     cfg = open("/cfg/selfrun_rl.toml").read()
     if smoke:
         cfg = cfg.replace("max_steps = 300", "max_steps = 3")
