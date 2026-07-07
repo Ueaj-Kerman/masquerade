@@ -69,6 +69,28 @@ def run(args):
         teacher = copy.deepcopy(student).to(torch.bfloat16)
         teacher.requires_grad_(False).eval()
 
+    mask_vec = None
+    if args.mask_emb_lr:
+        emb_mod = student.embed_tokens
+        mask_vec = torch.nn.Parameter(emb_mod.weight[MASK_ID].detach().clone().float())
+        orig_emb_forward = emb_mod.forward
+
+        def emb_forward(ids):
+            x = orig_emb_forward(ids)
+            return torch.where((ids == MASK_ID)[..., None], mask_vec.to(x.dtype), x)
+
+        emb_mod.forward = emb_forward
+
+    markov = None
+    if args.markov_rank > 0:
+        V = student.cfg.vocab_size
+        markov = torch.nn.ModuleDict({
+            "w1": torch.nn.Embedding(V, args.markov_rank),
+            "w2": torch.nn.Linear(args.markov_rank, V, bias=False),
+        }).to(device=device, dtype=torch.float32)
+        torch.nn.init.normal_(markov["w1"].weight, std=1.0)
+        torch.nn.init.zeros_(markov["w2"].weight)
+
     if args.grad_ckpt:
         from torch.utils.checkpoint import checkpoint
 
@@ -89,7 +111,14 @@ def run(args):
                                                 n_anchor=args.n_anchor))
 
     # Qwen3 pretraining optimizer: AdamW b=(0.9,0.95) eps=1e-6 wd=0.1 clip=1.0
-    opt = torch.optim.AdamW(student.parameters(), lr=args.lr, betas=(0.9, 0.95),
+    groups = [{"params": list(student.parameters()), "lr": args.lr}]
+    if markov is not None:
+        groups.append({"params": list(markov.parameters()),
+                       "lr": args.markov_lr or args.lr, "weight_decay": 0.0})
+    if mask_vec is not None:
+        groups.append({"params": [mask_vec], "lr": args.mask_emb_lr,
+                       "weight_decay": 0.0})
+    opt = torch.optim.AdamW(groups, lr=args.lr, betas=(0.9, 0.95),
                             eps=1e-6, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda st: min(1.0, (st + 1) / args.warmup)
@@ -114,6 +143,9 @@ def run(args):
             pos = torch.cat([vb["anchor_pos"], vb["mask_pos"]], 1)
             tl = teacher_forward(vb["teacher_ids"], pos)[:, args.n_anchor:]
             sl = gathered_logprobs(student, vb["student_ids"], pos)[:, args.n_anchor:]
+            if markov is not None:
+                prev = vb["teacher_ids"].gather(1, vb["mask_pos"])
+                sl = sl + markov["w2"](markov["w1"](prev)).float()
             valid = vb["mask_w"] > 0
             ag = (tl.argmax(-1) == sl.argmax(-1)).float()
             stats["agree"].append(ag[valid].mean().item())
@@ -141,6 +173,10 @@ def run(args):
         t_logits = teacher_forward(b["teacher_ids"], pos)
         s_logits = gathered_logprobs(student, b["student_ids"], pos)
         A = args.n_anchor
+        if markov is not None:
+            prev = b["teacher_ids"].gather(1, b["mask_pos"])
+            s_logits = torch.cat([s_logits[:, :A],
+                                  s_logits[:, A:] + markov["w2"](markov["w1"](prev)).float()], 1)
         t_lp, s_lp = F.log_softmax(t_logits, -1), F.log_softmax(s_logits, -1)
 
         # draft losses at mask slots
@@ -190,8 +226,14 @@ def run(args):
             log_f.write(json.dumps(v) + "\n")
             log_f.flush()
         if step % args.save_every == 0 or step == args.steps:
+            if mask_vec is not None:
+                with torch.no_grad():
+                    student.embed_tokens.weight[MASK_ID] = mask_vec
             sd = {k: v.to(torch.bfloat16) for k, v in student.state_dict().items()
                   if not k.startswith("rope_")}
+            if markov is not None:
+                sd.update({f"markov.{k}": v.to(torch.bfloat16)
+                           for k, v in markov.state_dict().items()})
             torch.save(sd, out_dir / f"ckpt_{step:06d}.pt")
 
 
@@ -218,6 +260,9 @@ def build_parser():
     ap.add_argument("--ema-every", type=int, default=1)
     ap.add_argument("--grad-ckpt", action="store_true", default=True)
     ap.add_argument("--no-grad-ckpt", dest="grad_ckpt", action="store_false")
+    ap.add_argument("--markov-rank", type=int, default=0)
+    ap.add_argument("--markov-lr", type=float, default=None)
+    ap.add_argument("--mask-emb-lr", type=float, default=None)
     ap.add_argument("--vocab-used", type=int, default=151669)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log-every", type=int, default=20)
