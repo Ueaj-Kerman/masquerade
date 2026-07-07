@@ -82,11 +82,11 @@
   or rejects — provably lossless under greedy decoding.</p>
 
   <div class="statrow">
-    <div class="stat"><div class="v">&tau; 5.65 = DSpark</div>
-      <div class="l">accepted tokens/round, Qwen3-4B GSM8K temp 1.0 — identical to DSpark&rsquo;s
+    <div class="stat"><div class="v">&tau; 6.20 &gt; DSpark</div>
+      <div class="l">accepted tokens/round, Qwen3-4B GSM8K temp 1.0 — +10% over DSpark&rsquo;s
       separate-1B-drafter 5.64, with no drafter at all</div></div>
-    <div class="stat"><div class="v g">62.5% = base</div>
-      <div class="l">GSM8K after training — zero base-capability loss (lr 1e-5 recipe)</div></div>
+    <div class="stat"><div class="v g">89.8% = base</div>
+      <div class="l">Qwen3-4B GSM8K after training — zero base-capability loss (lr 1e-5 + muP-hot head)</div></div>
     <div class="stat"><div class="v">1.98&times;</div>
       <div class="l">lossless wall-clock speedup, GSM8K B=1 on an RTX 5090 (533 vs 269 tok/s, fused decode)</div></div>
     <div class="stat"><div class="v">+1 row</div>
@@ -213,7 +213,8 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
     <tr><td>+ DSpark (repro, temp 1.0)</td><td>~1B separate</td><td>lossless</td><td>5.64</td><td>3.28</td></tr>
     <tr><td>+ masquerade lr3e-5 (temp 1.0)</td><td class="good">fused, +1 row</td><td>82.0%</td><td class="hl">5.65</td><td class="hl">3.43</td></tr>
     <tr><td>+ masquerade lr3e-5 (greedy)</td><td class="good">fused, +1 row</td><td>82.0%</td><td>6.68</td><td>3.78</td></tr>
-    <tr><td>+ masquerade lr1e-5</td><td>fused, +1 row</td><td colspan="3">interrupted at ~step 500 by host power failures (see notes)</td></tr>
+    <tr><td class="good">+ masquerade lr1e-5 + hot Markov (temp 1.0)</td><td class="good">fused, +1 row</td><td class="good">89.8% = base</td><td class="hl">6.20</td><td class="hl">3.55</td></tr>
+    <tr><td>+ same (greedy)</td><td>fused, +1 row</td><td>89.8%</td><td>6.93</td><td>3.76</td></tr>
   </table></div>
 
   <h3>4B on the local RTX 5090 (bf16, fused ckpt, greedy, mixed prompts)</h3>

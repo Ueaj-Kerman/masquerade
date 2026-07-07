@@ -161,8 +161,20 @@ already uses all 28 layers, so the low-rank bigram correction is redundant.
 | Qwen3-4B base | — | 89.1% | 2.03 (floor) | 2.01 | 2.03 |
 | + DSpark (repro, temp 1.0) | ~1B separate | lossless | 5.64 | 3.28 | — |
 | + masquerade lr3e-5 @2500 (greedy) | **fused, +1 row** | 82.0% | **6.68** | 3.78 | 5.17 |
-| + masquerade lr3e-5 @2500 (temp 1.0) | **fused, +1 row** | 82.0% | **5.65** | **3.43** | 4.42 |
-| + masquerade lr1e-5 | fused | lost to power failures @ ~step 500 | | | |
+| + masquerade lr3e-5 @2500 (temp 1.0) | fused, +1 row | 82.0% | 5.65 | 3.43 | 4.42 |
+| **+ masquerade lr1e-5 + hot markov (temp 1.0)** | **fused, +1 row** | **89.8% = base** | **6.20** | **3.55** | **4.89** |
+| + same (greedy) | fused, +1 row | 89.8% | 6.93 | 3.76 | 5.39 |
+
+**FINAL RESULT: the fused drafter BEATS DSpark on its own protocol (+10% τ
+gsm8k, +8% chat) at unchanged base quality, with zero drafter parameters.**
+Recipe: body lr 1e-5, Markov head lr 1e-3 (muP, user's catch), w_ntp 0.1,
+on-policy data, full teacher stop-grad, 3000 steps H200 (~95 min).
+Position-1 conditional acceptance 0.921 greedy.
+
+Three-tier 0.6B (adds hot [MASK] row @1e-2): faster mid-training convergence
+(0.637 vs 0.58 agreement at step 1500) but same endpoint (0.648 vs 0.653);
+τ 5.89/3.45/4.54 at GSM8K 60.9% vs two-tier 5.95/3.45/4.52 at 57.8% —
+quality slightly better, τ equal. Kept in the recipe for principle + speed.
 
 **At DSpark's exact protocol the fused drafter matches DSpark: 5.65 vs 5.64
 (gsm8k), 3.43 vs 3.28 (chat) — with zero drafter parameters.** The 3e-5 arm
