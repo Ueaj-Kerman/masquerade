@@ -157,17 +157,23 @@ def sweep2(steps: int = 1000):
 @app.function(image=image, gpu="H100:2", timeout=60 * 30,
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/root/.cache/huggingface": hf_cache})
-def cp_demo():
+def cp_demo(model: str = "", T: int = 8192):
+    import os
     import subprocess
 
+    env = dict(os.environ, CP_T=str(T))
+    if model:
+        from huggingface_hub import snapshot_download
+
+        env["MODEL_DIR"] = snapshot_download(model)
     r = subprocess.run(["torchrun", "--nproc-per-node", "2", "scripts/cp_demo.py"],
-                       cwd="/repo")
+                       cwd="/repo", env=env)
     return r.returncode
 
 
 @app.local_entrypoint()
-def run_cp_demo():
-    print("exit:", cp_demo.remote())
+def run_cp_demo(model: str = "", t: int = 8192):
+    print("exit:", cp_demo.remote(model, t))
 
 
 @app.local_entrypoint()

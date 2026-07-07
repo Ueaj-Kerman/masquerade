@@ -52,7 +52,7 @@ def main():
                           num_attention_heads=8, num_key_value_heads=4, head_dim=64)
         m = Qwen3(cfg).cuda().to(torch.bfloat16)
 
-    B, T = 2, 8192
+    B, T = 2, int(os.environ.get("CP_T", 8192))
     ids = torch.randint(10, 150000, (B, T), device="cuda")
     dist.broadcast(ids, 0)
     pos = torch.arange(T, device="cuda").expand(B, T)
