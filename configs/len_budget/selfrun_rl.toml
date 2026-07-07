@@ -15,5 +15,7 @@ max_completion_tokens = 3072
 id = "math-len-budget"
 name = "len-budget"
 args = { p_lax = 0.3 }
+[ckpt]  # save final weights
+
 [trainer]
 [inference]
