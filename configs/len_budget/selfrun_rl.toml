@@ -1,16 +1,16 @@
 # Self-hosted prime-rl 0.6.x (from ~/Projects/univerl2: uv run rl @ <this file>)
-max_steps = 300
+max_steps = 150
 seq_len = 6144
 [deployment]
-num_train_gpus = 2
-num_infer_gpus = 2
+num_train_gpus = 1
+num_infer_gpus = 3
 [model]
 name = "Qwen/Qwen3-4B"
 [orchestrator]
-batch_size = 256
+batch_size = 128
 group_size = 8
 [orchestrator.train.sampling]
-max_completion_tokens = 4096
+max_completion_tokens = 3072
 [[orchestrator.train.env]]
 id = "math-len-budget"
 name = "len-budget"
