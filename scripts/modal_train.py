@@ -109,7 +109,8 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
                                          temperature=temperature, thinking=thinking,
                                          max_new=max_new)
     if gsm_n:
-        rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov))
+        rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov, thinking=thinking,
+                                  max_new=max_new if thinking else 512))
     print(json.dumps(rec), flush=True)
     out = "/results/ckpt_evals.jsonl"
     with open(out, "a") as f:

@@ -142,12 +142,12 @@ def bench_acceptance(model: Qwen3, tok, k: int = 8, batch: int = 16, max_new: in
 
 @torch.no_grad()
 def gsm8k_accuracy(model: Qwen3, tok, n: int = 128, batch: int = 16, max_new: int = 512,
-                   compile_mode: str | None = None, markov=None):
+                   compile_mode: str | None = None, markov=None, thinking=False):
     qs, answers = load_gsm8k(n)
     qs = [q + "\nPlease reason step by step, and put your final answer within \\boxed{}." for q in qs]
-    prompts = encode_chat(tok, qs)
-    eng = Engine(model, batch=batch, max_len=2048, k=4, compile_mode=compile_mode,
-                 temperature=0.0, markov=markov)
+    prompts = encode_chat(tok, qs, thinking=thinking)
+    eng = Engine(model, batch=batch, max_len=2048 if not thinking else 3072, k=4,
+                 compile_mode=compile_mode, temperature=0.0, markov=markov)
     correct, total = 0, 0
     for i in range(0, len(prompts), batch):
         chunk = prompts[i:i + batch]
