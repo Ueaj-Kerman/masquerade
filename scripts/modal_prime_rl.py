@@ -45,7 +45,7 @@ def train(smoke: bool = False):
         cfg = cfg.replace("max_steps = 300", "max_steps = 3")
         cfg = cfg.replace("batch_size = 256", "batch_size = 32")
     open("/prime-rl/run.toml", "w").write(cfg)
-    r = subprocess.run([uv, "run", "rl", "@", "run.toml"], cwd="/prime-rl")
+    r = subprocess.run([uv, "run", "--no-sync", "rl", "@", "run.toml"], cwd="/prime-rl")
     out = "/results/lenbudget_rl_smoke" if smoke else "/results/lenbudget_rl"
     for cand in ("/prime-rl/outputs", "/prime-rl/logs", "/prime-rl/checkpoints"):
         try:
