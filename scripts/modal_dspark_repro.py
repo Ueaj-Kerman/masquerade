@@ -144,6 +144,60 @@ def bench_main(algo: str):
     return _bench_impl(algo)
 
 
+@app.function(image=image_main, gpu="H100", timeout=60 * 60 * 2,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
+              volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
+def bench_think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
+                max_new: int = 640, B: int = 8):
+    """tau of a locally-trained speculators dspark ckpt, THINKING prompts, t1.0."""
+    from transformers import AutoTokenizer
+    from vllm import LLM, SamplingParams
+
+    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
+    raw = build_prompts.__wrapped__(tok) if hasattr(build_prompts, "__wrapped__") else None
+    import urllib.request
+    url = ("https://raw.githubusercontent.com/openai/grade-school-math/master/"
+           "grade_school_math/data/test.jsonl")
+    lines = urllib.request.urlopen(url).read().decode().strip().splitlines()
+    gsm = [json.loads(l)["question"] +
+           "\nPlease reason step by step, and put your final answer within \\boxed{}."
+           for l in lines[:48]]
+    chat = ["Write a short story about a robot learning to paint.",
+            "Explain the difference between TCP and UDP to a beginner.",
+            "Compose an email declining a meeting politely.",
+            "What are the pros and cons of remote work?",
+            "Describe how photosynthesis works.",
+            "Give me a recipe for a quick vegetarian dinner.",
+            "Explain recursion with a simple example.",
+            "Summarize the causes of World War I."] * 6
+    def render(ql):
+        return [tok.apply_chat_template([{"role": "user", "content": q}], tokenize=False,
+                                        add_generation_prompt=True, enable_thinking=True)
+                for q in ql]
+    llm = LLM(model="Qwen/Qwen3-4B", dtype="bfloat16", max_model_len=4096,
+              gpu_memory_utilization=0.85, enable_prefix_caching=False,
+              speculative_config={"method": "dspark", "model": ckpt,
+                                  "num_speculative_tokens": 7})
+    sp = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=max_new)
+    results = {}
+    for name, plist in (("gsm8k", render(gsm)), ("chat", render(chat))):
+        m0 = spec_metrics(llm)
+        for i in range(0, len(plist), B):
+            llm.generate(plist[i:i + B], sp)
+        m1 = spec_metrics(llm)
+        results[name] = {"before": m0, "after": m1}
+        print(json.dumps({name: {k: m1.get(k) for k in m1}}), flush=True)
+    with open("/results/dspark_think_tau.json", "w") as f:
+        json.dump(results, f, indent=2)
+    vol.commit()
+    return results
+
+
+@app.local_entrypoint()
+def think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best"):
+    print(bench_think.remote(ckpt))
+
+
 @app.local_entrypoint()
 def main(algos: str = "", algos_main: str = "dspark"):
     calls = [bench.spawn(a) for a in algos.split(",") if a]
