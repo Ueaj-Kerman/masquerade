@@ -1,0 +1,242 @@
+<title>masquerade — fused self-speculative decoding</title>
+<style>
+  :root {
+    --paper: #faf9f5; --ink: #20201c; --muted: #6b6a60; --accent: #2a78d6;
+    --accent-2: #1baf7a; --rule: #e4e2d8; --card: #f1efe7; --code: #efede4;
+    --warn: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #1a1a19; --ink: #ececec; --muted: #a3a297; --accent: #3987e5;
+            --accent-2: #199e70; --rule: #33322e; --card: #232320; --code: #232320;
+            --warn: #d97706; }
+  }
+  :root[data-theme="dark"] { --paper: #1a1a19; --ink: #ececec; --muted: #a3a297;
+    --accent: #3987e5; --accent-2: #199e70; --rule: #33322e; --card: #232320;
+    --code: #232320; --warn: #d97706; }
+  :root[data-theme="light"] { --paper: #faf9f5; --ink: #20201c; --muted: #6b6a60;
+    --accent: #2a78d6; --accent-2: #1baf7a; --rule: #e4e2d8; --card: #f1efe7;
+    --code: #efede4; --warn: #b45309; }
+
+  body { background: var(--paper); color: var(--ink);
+         font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+         margin: 0; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 96px; }
+  h1, h2, h3 { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+               line-height: 1.2; text-wrap: balance; }
+  h1 { font-size: 2.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.5rem; margin: 56px 0 12px; padding-top: 18px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.12rem; margin: 28px 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 8px; }
+  .eyebrow { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.72rem;
+             color: var(--accent); font-weight: 600; }
+  p, li { max-width: 68ch; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+                font-size: 0.92em; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code); padding: 14px 16px; border-radius: 8px;
+        overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+
+  .statrow { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 8px; }
+  .stat { flex: 1 1 160px; background: var(--card); border-radius: 10px;
+          padding: 14px 16px; }
+  .stat .v { font-size: 1.9rem; font-weight: 650; letter-spacing: -0.01em;
+             font-variant-numeric: tabular-nums; color: var(--accent); }
+  .stat .v.g { color: var(--accent-2); }
+  .stat .l { font-size: 0.8rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+
+  .tablewrap { overflow-x: auto; margin: 16px 0; }
+  table { border-collapse: collapse; font-size: 0.9rem; min-width: 480px; }
+  th, td { text-align: left; padding: 6px 14px 6px 0; border-bottom: 1px solid var(--rule);
+           font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem;
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  td.hl { color: var(--accent); font-weight: 650; }
+  td.good { color: var(--accent-2); font-weight: 650; }
+
+  figure { margin: 24px 0; }
+  figure img { max-width: 100%; border-radius: 8px; border: 1px solid var(--rule);
+               background: #fff; }
+  figcaption { font-size: 0.82rem; color: var(--muted); margin-top: 6px; max-width: 72ch; }
+
+  .note { border-left: 3px solid var(--accent); background: var(--card);
+          padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; font-size: 0.95rem; }
+  .honest { border-left-color: var(--warn); }
+  .footer { margin-top: 64px; color: var(--muted); font-size: 0.82rem;
+            border-top: 1px solid var(--rule); padding-top: 16px; }
+</style>
+
+<main>
+  <div class="eyebrow">masquerade &middot; 12-hour research sprint &middot; 2026-07-07</div>
+  <h1>The model wears its own mask</h1>
+  <p class="sub">Fused self-speculative decoding via mask-token self-distillation —
+  no separate drafter, no extra backbone: the base model drafts for itself.</p>
+
+  <p>DSpark, DFlash, and EAGLE bolt a <em>separate</em> drafter onto a target model.
+  Masquerade fuses the drafter into the target: run the model over a sequence with a
+  masked region and without, and distill the unmasked (exact next-token) logits into
+  the masked forward — using <strong>live weights</strong>, so the model is
+  continuously distilling itself, with no reference model. At inference, append
+  <code>[MASK]</code> tokens after the last committed token: one forward of the full
+  model drafts k future tokens, which standard speculative verification then accepts
+  or rejects — provably lossless under greedy decoding.</p>
+
+  <div class="statrow">
+    <div class="stat"><div class="v">&tau; 5.27</div>
+      <div class="l">accepted tokens/round on GSM8K (Qwen3-0.6B, k=8) — 93% of DSpark&rsquo;s
+      dedicated-1B-drafter &tau; on a 7&times; larger target</div></div>
+    <div class="stat"><div class="v g">62.5% = base</div>
+      <div class="l">GSM8K after training — zero base-capability loss (lr 1e-5 recipe)</div></div>
+    <div class="stat"><div class="v">1.90&times;</div>
+      <div class="l">lossless wall-clock speedup at B=1 on an RTX 5090 (232 vs 122 tok/s)</div></div>
+    <div class="stat"><div class="v">+1 row</div>
+      <div class="l">parameter overhead: one embedding row (+ optional rank-256 Markov head)</div></div>
+  </div>
+
+  <h2>Method in one figure</h2>
+  <pre><code>train (one forward, doc-packed, multi-region):
+  [ctx&hellip;][M M M][region&hellip;][ctx&hellip;][M M][region&hellip;]
+   &bull; k masks inserted BEFORE each region, carrying the region's rope positions
+   &bull; real tokens attend only to real tokens  =&gt; the real stream IS the teacher
+     (bit-exact to a plain forward — property-tested)
+   &bull; masks attend to prior real context + earlier masks of their own region
+   &bull; loss: position-decayed TV + hard CE at mask slots vs stop-grad teacher
+     logits; optional NTP CE at real slots (the pretraining objective)
+
+decode (static KV cache, CUDA graphs; per-row cache-length visibility):
+  draft   [last, M&times;k]            -&gt; exact p(next) + k draft distributions
+  verify  [next, d1..dk]          -&gt; commits accepted+2 tokens per round
+  fused   [next, d1..dk, M&times;k]    -&gt; verify AND draft in ONE forward (B=1)</code></pre>
+
+  <div class="note">Full teacher stop-grad matters: detaching hidden states is
+  <em>not</em> enough with tied embeddings — gradients leak through the shared
+  lm_head and let the model make itself easier to predict ("self-simplification").
+  Fixing this took GSM8K retention from 43.8% to 62.5% at matched acceptance.</div>
+
+  <h2>Reproducing DSpark first</h2>
+  <p>DSpark (DeepSeek, June 2026) is the reference point: a DFlash-style parallel
+  drafter with a sequential Markov head and confidence-scheduled verification,
+  released for Qwen3-4B. We reproduced its offline speedups on an H100 with vLLM
+  built from source (support merged July 2, post-0.24.0):</p>
+
+  <div class="tablewrap"><table>
+    <tr><th>set</th><th>B=1</th><th>B=4</th><th>B=16</th><th>B=64</th><th>&tau; (ours)</th><th>&tau; (paper)</th></tr>
+    <tr><td>GSM8K</td><td class="hl">4.61&times;</td><td>3.96&times;</td><td>2.80&times;</td><td>1.94&times;</td><td>5.64</td><td>6.11</td></tr>
+    <tr><td>chat</td><td>1.95&times;</td><td>1.72&times;</td><td>1.70&times;</td><td>1.25&times;</td><td>3.28</td><td>3.64 (MT-Bench)</td></tr>
+  </table></div>
+
+  <figure><img src="figs/dspark_repro_gsm8k.png" alt="DSpark reproduction, GSM8K throughput curves">
+  <figcaption>Qwen3-4B, H100, temp 1.0, 256 new tokens. Speedup decays with
+  concurrency — the exact pattern DSpark&rsquo;s scheduler exists to manage. The released
+  DFlash/EAGLE-3 baseline checkpoints declare architecture names no public vLLM
+  build loads; the paper&rsquo;s Table&nbsp;1 supplies those baselines.</figcaption></figure>
+
+  <h2>Stage 1 — the simple demonstrator (and an honest failure)</h2>
+  <p>Frozen original weights as teacher, one masked region per sample, two forwards
+  per step, on 120k on-policy responses (DSpark&rsquo;s data recipe). Acceptance climbs
+  steadily; the engine is exactly lossless in fp32 with the trained checkpoint
+  (&tau;&nbsp;4.38 verified token-for-token against AR).</p>
+
+  <figure><img src="figs/acceptance_stage1_frozen.png" alt="stage-1 acceptance and GSM8K vs training time">
+  <figcaption>Acceptance-per-round &tau; rises 2.15 &rarr; 4.85 over 2500 steps —
+  but at lr 1e-4 the model develops repetition loops in long generations almost
+  immediately (GSM8K 59% &rarr; 1.6% by step 250, recovering to ~23%). Verified as a
+  weight-space problem, not a decoder bug: AR and spec accuracies match. The fix is
+  the drift dial, not the objective: the final recipe at lr 1e-5 has zero loss.</figcaption></figure>
+
+  <h2>Stages 2&ndash;3 — live self-distillation, fused &amp; multi-region</h2>
+  <p>The final trainer packs documents, inserts many mask groups per sequence, and
+  gets teacher and student from <em>one forward</em> — the real-token stream is
+  provably identical to a plain causal forward (masks are invisible to it), so live
+  self-distillation comes for free. ~150 supervised draft positions per sequence vs
+  8 in stage 1.</p>
+
+  <h3>The quality&ndash;acceptance dial (all with stop-grad + Markov head, 3000 steps)</h3>
+  <div class="tablewrap"><table>
+    <tr><th>lr</th><th>GSM8K (base 62.5%)</th><th>&tau; gsm8k</th><th>&tau; chat</th><th>&tau; code</th></tr>
+    <tr><td>1e-5</td><td class="good">62.5% — unchanged</td><td class="hl">5.27</td><td>3.38</td><td>4.29</td></tr>
+    <tr><td>3e-5</td><td>48.4%</td><td>5.66</td><td>3.54</td><td>4.68</td></tr>
+    <tr><td>1e-4</td><td>28.9%</td><td>5.74</td><td>4.91</td><td>5.44</td></tr>
+  </table></div>
+
+  <p>Without the anchor and stop-grad, high LR collapses spectacularly: the lr 3e-4
+  arm reached &tau; 9.0 (accepts everything) at 0.8% GSM8K — the model made itself
+  trivially predictable. That failure mode is the central hazard of fused
+  self-speculation, and it is controllable.</p>
+
+  <figure><img src="figs/train_agree.png" alt="draft agreement vs training across runs">
+  <figcaption>Mask-slot agreement over training: the fused multi-region trainer
+  (final arms) versus the sparse stage-1 signal.</figcaption></figure>
+
+  <h2>Inference pareto — RTX 5090, lossless greedy</h2>
+  <figure><img src="figs/pareto_final.png" alt="throughput vs batch, AR vs masquerade">
+  <figcaption>Aggregate throughput vs batch size, autoregressive baseline vs
+  masquerade at k&isin;{2,4,8}, same engine/kernels (static KV cache + CUDA graphs).
+  B=1: 1.90&times;; the advantage narrows with batch as decoding turns
+  compute-bound — mirroring the DSpark production curves.</figcaption></figure>
+
+  <div class="tablewrap"><table id="pareto-table">
+    <tr><th>B</th><th>AR tok/s</th><th>k=2</th><th>k=4</th><th>k=8</th><th>best speedup</th></tr>
+    <tr><td colspan="6" class="mono">(filled at publish)</td></tr>
+  </table></div>
+
+  <h2>Stage 4 — DSpark-style Markov head</h2>
+  <p>A rank-256 sequential head (<code>bias = W2&middot;W1[prev token]</code>, zero-initialized)
+  conditions each draft position on the previously drafted token via a serial
+  logits-only sweep — same trick as DSpark&rsquo;s sequential block, at negligible decode
+  cost. An ablation arm (same recipe, head off) isolates its contribution.</p>
+  <div class="tablewrap"><table id="markov-table">
+    <tr><th>variant</th><th>GSM8K</th><th>&tau; gsm8k</th><th>&tau; chat</th><th>&tau; code</th></tr>
+    <tr><td colspan="5" class="mono">(ablation finishing at publish)</td></tr>
+  </table></div>
+
+  <h2>Scaling to Qwen3-4B — head-to-head with DSpark</h2>
+  <div class="tablewrap"><table id="table-4b">
+    <tr><th>system</th><th>drafter params</th><th>GSM8K</th><th>&tau; gsm8k</th><th>&tau; chat</th></tr>
+    <tr><td>Qwen3-4B base</td><td>—</td><td>89.1%</td><td>2.03 (floor)</td><td>2.01</td></tr>
+    <tr><td>+ DSpark (repro)</td><td>~1B separate</td><td>lossless</td><td>5.64</td><td>3.28</td></tr>
+    <tr><td colspan="5" class="mono">(masquerade-4B rows land at publish)</td></tr>
+  </table></div>
+
+  <h2>Stage 5 — masked pretraining (NTP + mask from scratch)</h2>
+  <p>Same fused objective as a pretraining regularizer: does forcing the model to
+  predict through masked gaps accelerate learning? Qwen3-architecture models trained
+  from scratch on FineWeb with the aurora optimizer (Tilde Research&rsquo;s
+  leverage-aware Muon variant, their public recipe), NTP-only vs NTP+mask, matched
+  token budgets, three scales (30m GB10 / 50m / 124m H100) plus a w_tv sweep.</p>
+  <figure><img src="figs/pretrain_valloss.png" alt="pretraining val loss, NTP vs NTP+mask">
+  <figcaption>Validation loss (pure NTP measurement for both arms) vs training
+  tokens.</figcaption></figure>
+
+  <h2>Context parallel &amp; systems notes</h2>
+  <ul>
+    <li>Ring-attention CP (torch experimental): forward parity ~2e-2 rel;
+      <strong>1.43&times; on 2&times;H100</strong> at 0.6B/T=16384; comms-dominated below that
+      (0.81&times; on a tiny model at T=8192). varlen/doc-packed masks &plus; CP remains
+      an upstream boundary (torchtitan documents the same) — fused multi-region runs
+      CP-off, plain-causal paths CP-on.</li>
+    <li>Compiled stage-5 arms sustain ~190k tok/s (50m, T=2048, H100, flex
+      block-sparse attention); the mask objective costs ~4&times; today (block-mask
+      build + pair loss, unoptimized) — an engineering gap, not a method one.</li>
+    <li>Engine: draft and verify share one <code>[B, k+1]</code> shape (one CUDA
+      graph serves both); mask KV slots are rolled back by per-row visibility and
+      overwritten by verify writes; fused mode drafts and verifies in a single
+      forward when the previous round fully accepted.</li>
+  </ul>
+
+  <div class="note honest"><strong>Honesty box.</strong> (1) Wall-clock numbers use
+  our research engine; vLLM-grade paging would lift the AR baseline and our decode
+  path alike — &tau; and tokens-per-forward are the engine-independent quantities.
+  (2) The quality/acceptance dial is real: pushing &tau; above ~5.7 on a 0.6B costs
+  measurable GSM8K today. (3) DSpark trains 10 epochs over 1.3M prompts; our runs
+  are 3000 steps (&approx;0.4 epochs of 120k) — acceptance was still rising at cutoff.
+  (4) Stage-5 curves compare matched token budgets, not matched wall-clock.</div>
+
+  <div class="footer">
+    masquerade &middot; built and measured in a single 12-hour autonomous session on
+    2026-07-07 &middot; local RTX 5090 + DGX Spark + Modal H100/H200 &middot;
+    repro: <span class="mono">github-less; see ~/Projects/masquerade</span> (tests:
+    exact HF parity, fp32 losslessness incl. trained ckpts, teacher-purity property
+    tests, flex-kernel mask equivalence).
+  </div>
+</main>

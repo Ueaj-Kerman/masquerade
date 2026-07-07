@@ -86,7 +86,7 @@ def pretrain(argv: str):
               volumes={"/data": data_vol, "/results": res_vol,
                        "/root/.cache/huggingface": hf_cache})
 def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
-              gsm_n: int = 128, n_prompts: int = 48):
+              gsm_n: int = 128, n_prompts: int = 48, temperature: float = 0.0):
     import json
     import sys
 
@@ -102,10 +102,12 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
     tok = AutoTokenizer.from_pretrained(mdir)
     m = Qwen3.from_pretrained(mdir)
     markov = load_ckpt_into(m, ckpt) if ckpt != "base" else None
-    rec = {"ckpt": ckpt}
+    rec = {"ckpt": ckpt, "temperature": temperature}
     rec["acceptance"] = bench_acceptance(m, tok, k=k, n_prompts=n_prompts,
-                                         compile_mode=None, markov=markov)
-    rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov))
+                                         compile_mode=None, markov=markov,
+                                         temperature=temperature)
+    if gsm_n:
+        rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov))
     print(json.dumps(rec), flush=True)
     out = "/results/ckpt_evals.jsonl"
     with open(out, "a") as f:
@@ -115,8 +117,9 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
 
 
 @app.local_entrypoint()
-def eval_one(ckpt: str = "base", model: str = "Qwen/Qwen3-0.6B"):
-    r = eval_ckpt.remote(ckpt, model=model)
+def eval_one(ckpt: str = "base", model: str = "Qwen/Qwen3-0.6B",
+             temperature: float = 0.0, gsm_n: int = 128):
+    r = eval_ckpt.remote(ckpt, model=model, temperature=temperature, gsm_n=gsm_n)
     print(r.get("ckpt"), "gsm8k", r.get("gsm8k_acc"),
           {s: round(v["committed_per_round"], 3) for s, v in r["acceptance"].items()})
 

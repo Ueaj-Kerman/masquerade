@@ -29,6 +29,8 @@ def main():
     ap.add_argument("--compile", default="reduce-overhead")
     ap.add_argument("--out", default="results/pareto_local.jsonl")
     ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--max-len", type=int, default=2048,
+                    help="KV cache slots; SDPA reads all of them — keep tight")
     args = ap.parse_args()
 
     from transformers import AutoTokenizer
@@ -54,13 +56,14 @@ def main():
     f = out.open("a")
 
     def bench(mode, k, B):
-        eng = Engine(model, batch=B, max_len=2048, k=k, compile_mode=cm,
+        eng = Engine(model, batch=B, max_len=args.max_len, k=k, compile_mode=cm,
                      temperature=args.temperature, markov=markov)
         chunk = (prompts * ((B // len(prompts)) + 1))[:B]
         eng.generate(chunk, max_new=32, eos_id=eos, mode=mode)  # warmup/compile
         eng.generate(chunk, max_new=32, eos_id=eos, mode=mode)
         _, st = eng.generate(chunk, max_new=args.max_new, eos_id=eos, mode=mode)
         rec = {"mode": mode, "k": k, "B": B, "ckpt": args.ckpt,
+               "max_len": args.max_len, "compile": args.compile,
                "prompt_set": args.prompt_set, "temperature": args.temperature,
                **{kk: vv for kk, vv in st.items() if kk != "pos_cond_accept"}}
         if "pos_cond_accept" in st:

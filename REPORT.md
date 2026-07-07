@@ -109,6 +109,11 @@ mask arm at 28M tokens): val loss 4.557 post-fix vs 4.580 leaky.
   loss overhead — honest cost of the fused objective, unoptimized).
 (val-loss-vs-tokens comparison pending)
 
+## Local pareto (RTX 5090, masquerade-0.6B lr1e-5 ckpt, greedy, mixed prompts)
+
+B=1: AR 122 tok/s | k=2 172 (1.41x) | k=4 208 (1.71x) | k=8 **232 (1.90x, τ 4.57)**
+(batched rows pending; engine = compiled reduce-overhead CUDA graphs)
+
 ## 4B fused (H200, live, lr 3e-5, w_ntp 0.1, 3000 steps)
 
 step 100: mask agree 0.40 (vs 0.17 at step 20) — larger model learns the
