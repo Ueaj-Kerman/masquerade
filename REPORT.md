@@ -220,3 +220,12 @@ via Modal volume background commits (fused_4b_v2 ckpt_002500 survived) and
 local checkpoints; ~7h of the window was lost to the third outage.
 Recommendation: reseat GPU power, cap power for overnight runs
 (nvidia-smi -pl 450), consider ATX3.1 PSU headroom.
+
+## Length-budget RL (follow-up, in progress)
+
+Pre-RL phrasing probe (fused 4B, GSM8K, temp 1.0, k=8):
+strict "every token counts" -> 136.5 avg tokens, tau 5.92 | default -> 291.2,
+6.21 | lax "think as long as you need" -> 315.6, 6.28. Phrasing alone spans
+2.3x density with only -6% tau. RL plan: verifiers env with prompt-conditioned
+lambda (environments/math_len_budget), self-run prime-rl on Modal 2xH100
+(hosted catalog lacks Qwen3-4B; Qwen3.5 only). Smoke in flight.
