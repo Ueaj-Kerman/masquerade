@@ -87,6 +87,20 @@ def window_to_docs(win: np.ndarray):
     return docs
 
 
+def prefetch(fn, depth=4):
+    import queue
+    import threading
+
+    q = queue.Queue(maxsize=depth)
+
+    def worker():
+        while True:
+            q.put(fn())
+
+    threading.Thread(target=worker, daemon=True).start()
+    return q
+
+
 def build_batch(shards, rng, packer, B, T, use_mask):
     if not use_mask:
         wins = [shards.sample(rng, T) for _ in range(B)]
@@ -239,6 +253,8 @@ def main():
         model.train()
         return tot / cnt
 
+    batch_q = prefetch(lambda: build_batch(shards, rng, packer, args.batch_size,
+                                           args.T, use_mask))
     tokens_seen, t0 = 0, time.time()
     for step in range(1, args.steps + 1):
         s = lr_scale(step)
@@ -248,7 +264,7 @@ def main():
             for g in opt.param_groups:
                 g["lr"] = lr * s
 
-        b = build_batch(shards, rng, packer, args.batch_size, args.T, use_mask)
+        b = batch_q.get()
         if b["plain"]:
             x, y = b["ids"].cuda(), b["labels"].cuda()
             am = plain_attn_mask(x, b["docsep"], "cuda")

@@ -95,20 +95,17 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
     from huggingface_hub import snapshot_download
     from transformers import AutoTokenizer
 
-    from masquerade.evals import bench_acceptance, gsm8k_accuracy
+    from masquerade.evals import bench_acceptance, gsm8k_accuracy, load_ckpt_into
     from masquerade.qwen3 import Qwen3
 
     mdir = snapshot_download(model)
     tok = AutoTokenizer.from_pretrained(mdir)
     m = Qwen3.from_pretrained(mdir)
-    if ckpt != "base":
-        sd = torch.load(ckpt, map_location="cuda", weights_only=True)
-        m.load_state_dict(sd, strict=False)
-        m.lm_head.weight = m.embed_tokens.weight
+    markov = load_ckpt_into(m, ckpt) if ckpt != "base" else None
     rec = {"ckpt": ckpt}
     rec["acceptance"] = bench_acceptance(m, tok, k=k, n_prompts=n_prompts,
-                                         compile_mode=None)
-    rec.update(gsm8k_accuracy(m, tok, n=gsm_n))
+                                         compile_mode=None, markov=markov)
+    rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov))
     print(json.dumps(rec), flush=True)
     out = "/results/ckpt_evals.jsonl"
     with open(out, "a") as f:
@@ -135,7 +132,7 @@ def stage5(arms: str = "50m:ntp:15000,50m:ntp+mask:15000,124m:ntp:11500,124m:ntp
         name = f"{preset}_{obj.replace('+', '_')}"
         argvs.append(
             f"--preset {preset} --objective {obj} --optimizer aurora --steps {steps} "
-            f"--batch-size {bs} --T 2048 --compile --data /data/fineweb "
+            f"--batch-size {bs} --T 2048 --compile --attn flex --data /data/fineweb "
             f"--out-dir /results/pretrain/{name} --eval-every 250")
     for rc in pretrain.map(argvs):
         print("exit:", rc)
