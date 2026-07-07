@@ -86,7 +86,8 @@ def pretrain(argv: str):
               volumes={"/data": data_vol, "/results": res_vol,
                        "/root/.cache/huggingface": hf_cache})
 def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
-              gsm_n: int = 128, n_prompts: int = 48, temperature: float = 0.0):
+              gsm_n: int = 128, n_prompts: int = 48, temperature: float = 0.0,
+              thinking: bool = False, max_new: int = 256):
     import json
     import sys
 
@@ -105,7 +106,8 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
     rec = {"ckpt": ckpt, "temperature": temperature}
     rec["acceptance"] = bench_acceptance(m, tok, k=k, n_prompts=n_prompts,
                                          compile_mode=None, markov=markov,
-                                         temperature=temperature)
+                                         temperature=temperature, thinking=thinking,
+                                         max_new=max_new)
     if gsm_n:
         rec.update(gsm8k_accuracy(m, tok, n=gsm_n, markov=markov))
     print(json.dumps(rec), flush=True)
@@ -118,8 +120,10 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
 
 @app.local_entrypoint()
 def eval_one(ckpt: str = "base", model: str = "Qwen/Qwen3-0.6B",
-             temperature: float = 0.0, gsm_n: int = 128):
-    r = eval_ckpt.remote(ckpt, model=model, temperature=temperature, gsm_n=gsm_n)
+             temperature: float = 0.0, gsm_n: int = 128, thinking: bool = False,
+             max_new: int = 256):
+    r = eval_ckpt.remote(ckpt, model=model, temperature=temperature, gsm_n=gsm_n,
+                         thinking=thinking, max_new=max_new)
     print(r.get("ckpt"), "gsm8k", r.get("gsm8k_acc"),
           {s: round(v["committed_per_round"], 3) for s, v in r["acceptance"].items()})
 

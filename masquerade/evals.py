@@ -59,11 +59,11 @@ def load_gsm8k(n: int = 128, split: str = "test"):
     return [r["question"] for r in rows], [r["answer"].split("####")[-1].strip() for r in rows]
 
 
-def encode_chat(tok, texts, suffix=""):
+def encode_chat(tok, texts, suffix="", thinking=False):
     return [
         torch.tensor(
             tok(tok.apply_chat_template([{"role": "user", "content": t + suffix}], tokenize=False,
-                add_generation_prompt=True, enable_thinking=False),
+                add_generation_prompt=True, enable_thinking=thinking),
                 add_special_tokens=False)["input_ids"], device="cuda")
         for t in texts
     ]
@@ -102,11 +102,11 @@ def load_ckpt_into(model: Qwen3, ckpt_path, device="cuda"):
 def bench_acceptance(model: Qwen3, tok, k: int = 8, batch: int = 16, max_new: int = 256,
                      n_prompts: int = 64, temperature: float = 0.0,
                      compile_mode: str | None = "reduce-overhead", sets: tuple = ("gsm8k", "chat", "code"),
-                     markov=None):
+                     markov=None, thinking=False):
     """DSpark-style acceptance metrics per prompt category."""
     out = {}
-    eng = Engine(model, batch=batch, max_len=2048, k=k, compile_mode=compile_mode,
-                 temperature=temperature, markov=markov)
+    eng = Engine(model, batch=batch, max_len=2048 if not thinking else 3072, k=k,
+                 compile_mode=compile_mode, temperature=temperature, markov=markov)
     for name in sets:
         if name == "gsm8k":
             qs, _ = load_gsm8k(n_prompts)
@@ -115,7 +115,7 @@ def bench_acceptance(model: Qwen3, tok, k: int = 8, batch: int = 16, max_new: in
             qs = (CHAT_PROMPTS * ((n_prompts // len(CHAT_PROMPTS)) + 1))[:n_prompts]
         else:
             qs = (CODE_PROMPTS * ((n_prompts // len(CODE_PROMPTS)) + 1))[:n_prompts]
-        prompts = encode_chat(tok, qs)
+        prompts = encode_chat(tok, qs, thinking=thinking)
         agg = {"tokens": 0, "wall_s": 0.0, "rounds": 0, "forwards": 0,
                "acc_hist": torch.zeros(k + 1), "pos_reach": torch.zeros(k), "pos_accept": torch.zeros(k)}
         for i in range(0, len(prompts), batch):
