@@ -24,6 +24,9 @@ FIGS.mkdir(parents=True, exist_ok=True)
 CAT = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948",
        "#e87ba4", "#eb6834"]
 GRAY = "#6b6a60"
+plt.rcParams["axes.prop_cycle"] = plt.cycler(color=CAT)
+plt.rcParams["axes.grid"] = True
+plt.rcParams["grid.alpha"] = 0.25
 C = {"ar": GRAY, "base": GRAY, "spec": CAT[0], "dspark": CAT[5],
      "dflash": CAT[4], "eagle3": CAT[1], "ntp": GRAY, "ntp+mask": CAT[0]}
 
