@@ -132,17 +132,23 @@ def fig_pretrain():
     runs = sorted(ROOT.glob("results/pretrain/*/log.jsonl"))
     if not runs:
         return
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(7.5, 5))
+    ci = 0
     for run in runs:
         rows = [r for r in load_jsonl(run) if "val_loss" in r]
         if not rows:
             continue
         name = run.parent.name
-        color = C["ntp+mask"] if "mask" in name else C["ntp"]
+        if "mask" in name:
+            color = CAT[ci % len(CAT)]
+            ci += 1
+            style = dict(color=color)
+        else:
+            style = dict(color=GRAY, ls="--")
         ax.plot([r["tok"] / 1e6 for r in rows], [r["val_loss"] for r in rows],
-                marker="o", ms=3, label=name, color=color, alpha=0.9)
-    ax.set(xlabel="training tokens (M)", ylabel="val loss (fineweb)",
-           title="pretraining: NTP vs NTP+mask")
+                marker="o", ms=3, label=name, alpha=0.9, **style)
+    ax.set(xlabel="training tokens (M)", ylabel="val loss (fineweb)", xscale="log",
+           title="pretraining: NTP (dashed gray) vs NTP+mask variants")
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(FIGS / "pretrain_valloss.png", dpi=150)
