@@ -82,6 +82,22 @@ def run(args):
             teacher = teacher.to(torch.bfloat16)
         teacher.requires_grad_(False).eval()
 
+    mask_vec = None
+    if args.mask_emb_lr:
+        # muP: the [MASK] row is a NEW token embedding — train it O(1)-hot in
+        # its own parameter, overriding the (tied) embedding at mask positions.
+        emb_mod = student.embed_tokens
+        mask_vec = torch.nn.Parameter(
+            emb_mod.weight[MASK_ID].detach().clone().float())
+        orig_emb_forward = emb_mod.forward
+
+        def emb_forward(ids):
+            x = orig_emb_forward(ids)
+            return torch.where((ids == MASK_ID)[..., None],
+                               mask_vec.to(x.dtype), x)
+
+        emb_mod.forward = emb_forward
+
     markov = None
     if args.markov_rank > 0:
         # DSpark-style low-rank sequential head: bias(prev_token) added to mask
@@ -122,6 +138,9 @@ def run(args):
     if markov is not None:
         groups.append({"params": list(markov.parameters()),
                        "lr": args.markov_lr or args.lr, "weight_decay": 0.0})
+    if mask_vec is not None:
+        groups.append({"params": [mask_vec], "lr": args.mask_emb_lr,
+                       "weight_decay": 0.0})
     opt = torch.optim.AdamW(groups, lr=args.lr, betas=(0.9, 0.95),
                             eps=1e-6, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.LambdaLR(
@@ -211,6 +230,9 @@ def run(args):
             print("VAL " + json.dumps(v), flush=True)
             log_f.write(json.dumps(v) + "\n"); log_f.flush()
         if step % args.save_every == 0 or step == args.steps:
+            if mask_vec is not None:  # fold the hot row back for standard ckpts
+                with torch.no_grad():
+                    student.embed_tokens.weight[MASK_ID] = mask_vec
             sd = {k: v.to(torch.bfloat16) for k, v in student.state_dict().items()
                   if not k.startswith("rope_")}
             if markov is not None:
@@ -236,6 +258,8 @@ def build_parser():
     ap.add_argument("--markov-rank", type=int, default=0, help="sequential head rank (0=off)")
     ap.add_argument("--markov-lr", type=float, default=None,
                     help="separate lr for the markov head (muP-ish, >> body lr)")
+    ap.add_argument("--mask-emb-lr", type=float, default=None,
+                    help="separate hot lr for the [MASK] embedding row (muP)")
     ap.add_argument("--max-samples", type=int, default=None)
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.1)
