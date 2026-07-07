@@ -114,8 +114,28 @@ mask arm at 28M tokens): val loss 4.557 post-fix vs 4.580 leaky.
 
 ## Local pareto (RTX 5090, masquerade-0.6B lr1e-5 ckpt, greedy, mixed prompts)
 
-B=1: AR 122 tok/s | k=2 172 (1.41x) | k=4 208 (1.71x) | k=8 **232 (1.90x, τ 4.57)**
-(batched rows pending; engine = compiled reduce-overhead CUDA graphs)
+Tight KV cache (768 slots), compiled CUDA graphs:
+
+| B | AR tok/s | k=4 | k=8 | best speedup |
+|---|---|---|---|---|
+| 1 | 264 | 406 | 427 | **1.62x** |
+| 4 | 361 | 474 | 419 | 1.31x |
+| 8 | 346 | 455 | 361 | 1.31x |
+| 16 | 705 | 788 | 760 | 1.12x |
+| 32 | 1088 | 1383 | 1346 | 1.27x |
+
+Masquerade wins at EVERY batch size (lossless greedy). Base-model control:
+spec on UNTRAINED masks is SLOWER than AR (233 vs 255 at B=1) — the speedup
+comes from training, not machinery. Engine finding: SDPA reads the whole
+preallocated cache, so cache sizing matters (AR B=1 122->264 tok/s when
+2048->768 slots); vLLM-style paging is the obvious next step.
+
+## Stage 4 verdict: Markov head adds ~nothing on a fused drafter
+
+Same weights, head on vs off at inference: τ gsm8k 5.36 vs 5.31, chat/code
+within noise. DSpark's sequential head compensates for their shallow 5-layer
+drafter; a fused drafter already uses all 28 layers, so the low-rank bigram
+correction is redundant. (Training-side ablation arm pending.)
 
 ## 4B fused (H200, live, w_ntp 0.1, markov r=256) — the DSpark head-to-head
 
