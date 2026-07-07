@@ -236,3 +236,18 @@ step: 250 -> 2500 | tau gsm8k 4.25 -> 5.37 (chat 2.76->3.04, code 3.21->4.03)
 GSM8K stays 0.49-0.62 all run (base 0.625, n=128) — NO quality crater.
 Training val_agree 0.517@750 vs original 0.333@750. The stage-1 failure was
 parameterization, not the objective.
+
+## Thinking-mode comparison (blog, in progress)
+
+Fused three-tier on 50k thinking regenerations (T=4096, 3000 steps H200):
+- tau (temp 1.0, INSIDE thinking traces, k=8): gsm8k 5.18 / chat 3.43 / code
+  4.18 (pos1 0.836); base floor 2.03/2.01/2.01.
+- Quality: GSM8K in thinking mode 55.2% vs base 54.2% (n=96, 1280-tok budget,
+  matched truncation) — preserved on-distribution. NON-thinking GSM8K drops to
+  28% — mode-localized drift: the NTP anchor only protects the distribution it
+  trains on (thinking-format here). Fix if needed: mix both formats in data.
+- Note: thinking tau (5.18) < non-thinking tau (6.20) at t1.0 — temp-1.0
+  reasoning traces are MORE entropic than polished answers, contradicting the
+  "stereotyped traces are easy" intuition.
+DSpark drafter on identical data: training (epoch 1/3). Length-penalty RL:
+step 68/150, reward 0.63-0.74.
