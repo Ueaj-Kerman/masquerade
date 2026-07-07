@@ -58,9 +58,28 @@ Final runs (3000 steps + Markov head r=256): lr 3e-5 and 1e-5, pending.
 ## Stage 1: frozen-teacher, single region (0.6B local)
 
 val mask-slot argmax agreement vs steps (lr 1e-4, anchor-KL 1.0):
-125: 0.232 | 250: 0.258 | 375: 0.298 | 500: 0.303 | 625: 0.298 | 750: 0.333
-Position-1 acceptance ~0.55 by step 750, decaying to ~0.10 at position 8.
-(acceptance/GSM8K vs training-time curves from checkpoints pending run end)
+125: 0.232 | 250: 0.258 | 500: 0.303 | 750: 0.333 | 1000: 0.323 | 1250: 0.343 |
+1500: 0.372 | 1750: 0.380 — still climbing at 2.5k steps; single-region signal
+is ~20x sparser per forward than the fused multi-region trainer, which reaches
+0.40+ by step 300. Position-1 agreement 0.62 by step 1750.
+(engine acceptance + GSM8K per checkpoint: pending)
+
+## Stage 2b: packing / compile / context parallel
+
+- doc packing + one-forward multi-region: default in train_fused (stage 3)
+- torch.compile: stage-5 arms run compiled H100 at ~190k tok/s (50m, T=2048)
+- context parallel (2xH100, torch experimental ring attention): forward parity
+  rel err ~2e-2 (bf16 accumulation). Tiny model @ T=8192: 0.81x (comms-
+  dominated). **Qwen3-0.6B @ T=16384: 1.43x** (300ms -> 210ms/fwd). varlen/
+  doc-packed masks + CP remains unsupported upstream (torchtitan documents the
+  same boundary) — fused multi-region runs CP-off; plain-causal paths CP-on.
+
+## Teacher stop-grad ablation (user-flagged bug, fixed 06:45 UTC)
+
+Detaching teacher hidden states is NOT sufficient with tied embeddings: grads
+leak through lm_head into the teacher stream ("self-simplification" pressure).
+All fused runs relaunched post-fix (v2). First matched-token check (stage5 50m
+mask arm at 28M tokens): val loss 4.557 post-fix vs 4.580 leaky.
 
 ## Stage 5: pretraining NTP vs NTP+mask (fineweb, aurora optimizer)
 

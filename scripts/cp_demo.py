@@ -83,24 +83,22 @@ def main():
     del ref, out_l, out_full
     torch.cuda.empty_cache()
 
-    # throughput: fwd+bwd step time, CP on vs off (rank-local timing).
-    # loss on hidden states — full-vocab logits at T=8192 would dominate memory.
-    m.requires_grad_(True)
+    # throughput: forward step time, CP on vs off (rank-local timing).
+    # forward-only: fwd+bwd at long T needs grad-ckpt, out of scope for a demo.
+    @torch.no_grad()
     def step(cp: bool):
         ids_s, pos_s = ids.clone(), pos.clone()
         torch.cuda.synchronize(); dist.barrier()
         t0 = time.perf_counter()
-        for _ in range(5):
+        for _ in range(8):
             if cp:
-                with context_parallel(mesh, buffers=[ids_s, pos_s], buffer_seq_dims=[1, 1]):
-                    h = m(ids_s, positions=pos_s, return_hidden=True)
-                    h.float().pow(2).mean().backward()
+                with context_parallel(mesh, buffers=[ids_s, pos_s],
+                                      buffer_seq_dims=[1, 1]):
+                    m(ids_s, positions=pos_s, return_hidden=True)
             else:
-                h = m(ids, positions=pos, return_hidden=True)
-                h.float().pow(2).mean().backward()
-            m.zero_grad(set_to_none=True)
+                m(ids, positions=pos, return_hidden=True)
         torch.cuda.synchronize()
-        return (time.perf_counter() - t0) / 5
+        return (time.perf_counter() - t0) / 8
 
     t_off = step(False)
     t_on = step(True)
