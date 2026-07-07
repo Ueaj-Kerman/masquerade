@@ -124,6 +124,10 @@ Tight KV cache (768 slots), compiled CUDA graphs:
 | 16 | 705 | 788 | 760 | 1.12x |
 | 32 | 1088 | 1383 | 1346 | 1.27x |
 
+Fused single-forward decode mode (draft+verify in one pass when the previous
+round fully accepts), GSM8K B=1: AR 269 | two-phase 451 | **fused 533 tok/s =
+1.98x lossless**, 2.74 tokens/forward.
+
 Masquerade wins at EVERY batch size (lossless greedy). Base-model control:
 spec on UNTRAINED masks is SLOWER than AR (233 vs 255 at B=1) — the speedup
 comes from training, not machinery. Engine finding: SDPA reads the whole
