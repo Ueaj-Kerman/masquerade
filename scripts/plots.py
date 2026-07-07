@@ -20,8 +20,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FIGS = ROOT / "results/figs"
 FIGS.mkdir(parents=True, exist_ok=True)
 
-C = {"ar": "#888888", "base": "#888888", "spec": "#0b6e99", "dspark": "#c2410c",
-     "dflash": "#7c3aed", "eagle3": "#15803d", "ntp": "#888888", "ntp+mask": "#0b6e99"}
+# validated categorical palette (dataviz reference, light mode, fixed order)
+CAT = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948",
+       "#e87ba4", "#eb6834"]
+GRAY = "#6b6a60"
+C = {"ar": GRAY, "base": GRAY, "spec": CAT[0], "dspark": CAT[5],
+     "dflash": CAT[4], "eagle3": CAT[1], "ntp": GRAY, "ntp+mask": CAT[0]}
 
 
 def load_jsonl(p):
@@ -79,7 +83,8 @@ def fig_pareto_local():
             sp = sorted([r for r in sel if r["mode"] == "spec" and r["k"] == k],
                         key=lambda r: r["B"])
             ax.plot([r["B"] for r in sp], [r["tok_s"] for r in sp], marker="o",
-                    label=f"masquerade k={k}")
+                    color=CAT[[4,8,12,2,6].index(k) % len(CAT)] if k in (2,4,6,8,12) else None,
+                    label=f"masquerade k={k}", lw=2)
         ax.set(xlabel="batch size", ylabel="tokens/s (aggregate)", xscale="log",
                title=f"throughput vs batch — {Path(tag).parent.name if tag != 'base' else 'base model'}")
         ax.legend()
