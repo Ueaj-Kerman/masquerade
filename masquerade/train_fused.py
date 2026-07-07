@@ -91,7 +91,9 @@ def run(args):
             "w1": torch.nn.Embedding(V, args.markov_rank),
             "w2": torch.nn.Linear(args.markov_rank, V, bias=False),
         }).to(device=device, dtype=torch.float32)
-        torch.nn.init.normal_(markov["w1"].weight, std=0.02)
+        # muP-style: embedding-like W1 at unit scale with its own O(1)-ish lr
+        # (a 1e-5 body lr on an N(0,0.02) embedding trains the head ~nowhere)
+        torch.nn.init.normal_(markov["w1"].weight, std=1.0)
         torch.nn.init.zeros_(markov["w2"].weight)
 
     if args.grad_ckpt and not args.tiny:
@@ -116,10 +118,11 @@ def run(args):
     val_batches = [val_packer.build(vseqs[j:j + args.batch_size])
                    for j in range(0, max(len(vseqs) - args.batch_size + 1, 1), args.batch_size)][:4]
 
-    params = list(student.parameters())
+    groups = [{"params": list(student.parameters()), "lr": args.lr}]
     if markov is not None:
-        params += list(markov.parameters())
-    opt = torch.optim.AdamW(params, lr=args.lr, betas=(0.9, 0.95),
+        groups.append({"params": list(markov.parameters()),
+                       "lr": args.markov_lr or args.lr, "weight_decay": 0.0})
+    opt = torch.optim.AdamW(groups, lr=args.lr, betas=(0.9, 0.95),
                             eps=1e-6, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda st: min(1.0, (st + 1) / args.warmup)
@@ -231,6 +234,8 @@ def build_parser():
     ap.add_argument("--max-pairs", type=int, default=256)
     ap.add_argument("--n-ntp", type=int, default=64, help="NTP positions per row")
     ap.add_argument("--markov-rank", type=int, default=0, help="sequential head rank (0=off)")
+    ap.add_argument("--markov-lr", type=float, default=None,
+                    help="separate lr for the markov head (muP-ish, >> body lr)")
     ap.add_argument("--max-samples", type=int, default=None)
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.1)
