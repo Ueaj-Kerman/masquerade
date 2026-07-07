@@ -16,7 +16,7 @@ image = (
         "git config --global url.https://github.com/.insteadOf git@github.com:",
         "git clone --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
         "cd /prime-rl && git submodule update --init --depth 1",
-        "cd /prime-rl && /root/.local/bin/uv sync --no-dev 2>&1 | tail -3",
+        "cd /prime-rl && /root/.local/bin/uv sync --no-dev --extra flash-attn 2>&1 | tail -3",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "WANDB_MODE": "offline"})
     .add_local_dir("environments/math_len_budget", "/env/math_len_budget")
