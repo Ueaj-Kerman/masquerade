@@ -169,7 +169,7 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
   (final arms) versus the sparse stage-1 signal.</figcaption></figure>
 
   <h2>Inference pareto — RTX 5090, lossless greedy</h2>
-  <figure><img src="figs/pareto_final.png" alt="throughput vs batch, AR vs masquerade">
+  <figure><img src="figs/pareto_final06b_lr1e-5.png" alt="throughput vs batch, AR vs masquerade">
   <figcaption>Aggregate throughput vs batch size, autoregressive baseline vs
   masquerade at k&isin;{2,4,8}, same engine/kernels (static KV cache + CUDA graphs).
   B=1: 1.90&times;; the advantage narrows with batch as decoding turns
@@ -213,8 +213,13 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
     <tr><td>+ DSpark (repro, temp 1.0)</td><td>~1B separate</td><td>lossless</td><td>5.64</td><td>3.28</td></tr>
     <tr><td>+ masquerade lr3e-5 (temp 1.0)</td><td class="good">fused, +1 row</td><td>82.0%</td><td class="hl">5.65</td><td class="hl">3.43</td></tr>
     <tr><td>+ masquerade lr3e-5 (greedy)</td><td class="good">fused, +1 row</td><td>82.0%</td><td>6.68</td><td>3.78</td></tr>
-    <tr><td>+ masquerade lr1e-5 (training at publish)</td><td>fused, +1 row</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>+ masquerade lr1e-5</td><td>fused, +1 row</td><td colspan="3">interrupted at ~step 500 by host power failures (see notes)</td></tr>
   </table></div>
+
+  <h3>4B on the local RTX 5090 (bf16, fused ckpt, greedy, mixed prompts)</h3>
+  <p>AR 103 tok/s &rarr; k=4 192 (1.86&times;, &tau; 5.02) &rarr; k=8 <strong>222 tok/s
+  (2.15&times; lossless, &tau; 6.30)</strong> at B=1 — a 4B model decoding above 220
+  tok/s on a desktop GPU with zero quality loss under greedy verification.</p>
 
   <h2>Stage 5 — masked pretraining (NTP + mask from scratch)</h2>
   <p>Same fused objective as a pretraining regularizer: does forcing the model to
