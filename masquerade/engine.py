@@ -46,8 +46,14 @@ class Engine:
         self.n_rounds = 0
         self.n_forwards = 0
 
-        self._fwd = torch.compile(self._fwd_raw, mode=compile_mode, dynamic=False) \
-            if compile_mode else self._fwd_raw
+        if compile_mode:
+            # cache buffers are forward-args, not model buffers; without static
+            # marking their in-graph mutation disables cudagraph capture
+            torch._dynamo.mark_static_address(self.cache.k)
+            torch._dynamo.mark_static_address(self.cache.v)
+            self._fwd = torch.compile(self._fwd_raw, mode=compile_mode, dynamic=False)
+        else:
+            self._fwd = self._fwd_raw
 
     # ---------------- low level ----------------
     def _fwd_raw(self, ids, pos):

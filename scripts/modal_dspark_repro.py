@@ -145,9 +145,9 @@ def bench_main(algo: str):
 
 
 @app.local_entrypoint()
-def main(algos: str = "base,dflash,eagle3"):
-    calls = [bench.spawn(a) for a in algos.split(",")]
-    calls.append(bench_main.spawn("dspark"))
+def main(algos: str = "", algos_main: str = "dspark"):
+    calls = [bench.spawn(a) for a in algos.split(",") if a]
+    calls += [bench_main.spawn(a) for a in algos_main.split(",") if a]
     for c in calls:
         try:
             print("saved:", c.get())

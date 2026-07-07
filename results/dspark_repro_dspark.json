@@ -1,0 +1,212 @@
+[
+  {
+    "set": "gsm8k",
+    "B": 1,
+    "algo": "dspark",
+    "wall_s": 0.22877170699999283,
+    "gen_tokens": 246,
+    "tok_s": 1075.307795819383,
+    "tok_s_per_seq": 1075.307795819383,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 2,
+    "algo": "dspark",
+    "wall_s": 0.4741526580000084,
+    "gen_tokens": 356,
+    "tok_s": 750.8130430010026,
+    "tok_s_per_seq": 375.4065215005013,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 4,
+    "algo": "dspark",
+    "wall_s": 0.269536923000004,
+    "gen_tokens": 713,
+    "tok_s": 2645.277656449278,
+    "tok_s_per_seq": 661.3194141123195,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 8,
+    "algo": "dspark",
+    "wall_s": 0.35437521700001184,
+    "gen_tokens": 1682,
+    "tok_s": 4746.381573291407,
+    "tok_s_per_seq": 593.2976966614259,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 16,
+    "algo": "dspark",
+    "wall_s": 0.44647724399999333,
+    "gen_tokens": 3671,
+    "tok_s": 8222.143567971081,
+    "tok_s_per_seq": 513.8839729981926,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 32,
+    "algo": "dspark",
+    "wall_s": 0.48483476900000255,
+    "gen_tokens": 7261,
+    "tok_s": 14976.236161808687,
+    "tok_s_per_seq": 468.00738005652147,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "gsm8k",
+    "B": 64,
+    "algo": "dspark",
+    "wall_s": 0.7430785420000063,
+    "gen_tokens": 13886,
+    "tok_s": 18687.122847910043,
+    "tok_s_per_seq": 291.9862944985944,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 1,
+    "algo": "dspark",
+    "wall_s": 0.5611563090000118,
+    "gen_tokens": 256,
+    "tok_s": 456.2008764655885,
+    "tok_s_per_seq": 456.2008764655885,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 2,
+    "algo": "dspark",
+    "wall_s": 0.6227077739999913,
+    "gen_tokens": 512,
+    "tok_s": 822.2155260904244,
+    "tok_s_per_seq": 411.1077630452122,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 4,
+    "algo": "dspark",
+    "wall_s": 0.6330562079999993,
+    "gen_tokens": 897,
+    "tok_s": 1416.9357928482727,
+    "tok_s_per_seq": 354.2339482120682,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 8,
+    "algo": "dspark",
+    "wall_s": 0.7126637350000067,
+    "gen_tokens": 1935,
+    "tok_s": 2715.1655191209943,
+    "tok_s_per_seq": 339.3956898901243,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 16,
+    "algo": "dspark",
+    "wall_s": 0.6756702750000159,
+    "gen_tokens": 3875,
+    "tok_s": 5735.045840221266,
+    "tok_s_per_seq": 358.44036501382914,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 32,
+    "algo": "dspark",
+    "wall_s": 0.8169142899999997,
+    "gen_tokens": 7702,
+    "tok_s": 9428.161674096806,
+    "tok_s_per_seq": 294.6300523155252,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  },
+  {
+    "set": "chat",
+    "B": 64,
+    "algo": "dspark",
+    "wall_s": 1.105854330999989,
+    "gen_tokens": 15581,
+    "tok_s": 14089.559142848946,
+    "tok_s_per_seq": 220.14936160701478,
+    "metrics_before": {
+      "error": "Stat logging disabled"
+    },
+    "metrics_after": {
+      "error": "Stat logging disabled"
+    }
+  }
+]

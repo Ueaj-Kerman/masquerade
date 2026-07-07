@@ -19,8 +19,8 @@ image = (
     .uv_pip_install("torch", "transformers", "datasets", "safetensors", "numpy",
                     "hf_transfer")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
-    .add_local_dir(".", "/repo", ignore=[".venv*", ".git", "data", "results",
-                                         "third_party", "*.log"])
+    .add_local_dir(".", "/repo", ignore=[".venv*", "**/.git", "data", "results",
+                                         "*.log"])
 )
 
 data_vol = modal.Volume.from_name("masquerade-data", create_if_missing=True)
@@ -64,6 +64,81 @@ def main(args: str = "", module: str = "masquerade.train_fused",
     fn = train_big if big else train
     rc = fn.remote(args, module, model)
     print("exit:", rc)
+
+
+@app.function(image=image, gpu="H100", timeout=60 * 60 * 8,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
+              volumes={"/data": data_vol, "/results": res_vol,
+                       "/root/.cache/huggingface": hf_cache})
+def pretrain(argv: str):
+    import subprocess
+    import sys
+
+    cmd = [sys.executable, "scripts/pretrain.py"] + shlex.split(argv)
+    print("RUN:", " ".join(cmd), flush=True)
+    r = subprocess.run(cmd, cwd="/repo")
+    res_vol.commit()
+    return r.returncode
+
+
+@app.function(image=image, gpu="H100", timeout=60 * 60 * 2,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
+              volumes={"/data": data_vol, "/results": res_vol,
+                       "/root/.cache/huggingface": hf_cache})
+def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
+              gsm_n: int = 128, n_prompts: int = 48):
+    import json
+    import sys
+
+    sys.path.insert(0, "/repo")
+    import torch
+    from huggingface_hub import snapshot_download
+    from transformers import AutoTokenizer
+
+    from masquerade.evals import bench_acceptance, gsm8k_accuracy
+    from masquerade.qwen3 import Qwen3
+
+    mdir = snapshot_download(model)
+    tok = AutoTokenizer.from_pretrained(mdir)
+    m = Qwen3.from_pretrained(mdir)
+    if ckpt != "base":
+        sd = torch.load(ckpt, map_location="cuda", weights_only=True)
+        m.load_state_dict(sd, strict=False)
+        m.lm_head.weight = m.embed_tokens.weight
+    rec = {"ckpt": ckpt}
+    rec["acceptance"] = bench_acceptance(m, tok, k=k, n_prompts=n_prompts,
+                                         compile_mode=None)
+    rec.update(gsm8k_accuracy(m, tok, n=gsm_n))
+    print(json.dumps(rec), flush=True)
+    out = "/results/ckpt_evals.jsonl"
+    with open(out, "a") as f:
+        f.write(json.dumps(rec) + "\n")
+    res_vol.commit()
+    return rec
+
+
+@app.local_entrypoint()
+def eval_sweep(ckpts: str = "base,/results/live_lr3e-5/ckpt_000600.pt,"
+                            "/results/live_lr1e-4/ckpt_000600.pt,"
+                            "/results/live_lr3e-4/ckpt_000600.pt"):
+    for r in eval_ckpt.map(ckpts.split(",")):
+        print(r.get("ckpt"), "gsm8k", r.get("gsm8k_acc"),
+              {s: round(v["committed_per_round"], 3) for s, v in r["acceptance"].items()})
+
+
+@app.local_entrypoint()
+def stage5(arms: str = "50m:ntp:15000,50m:ntp+mask:15000,124m:ntp:11500,124m:ntp+mask:11500"):
+    argvs = []
+    for arm in arms.split(","):
+        preset, obj, steps = arm.split(":")
+        bs = 64 if preset == "124m" else 32
+        name = f"{preset}_{obj.replace('+', '_')}"
+        argvs.append(
+            f"--preset {preset} --objective {obj} --optimizer aurora --steps {steps} "
+            f"--batch-size {bs} --T 2048 --compile --data /data/fineweb "
+            f"--out-dir /results/pretrain/{name} --eval-every 250")
+    for rc in pretrain.map(argvs):
+        print("exit:", rc)
 
 
 @app.local_entrypoint()

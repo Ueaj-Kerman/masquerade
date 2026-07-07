@@ -191,6 +191,14 @@ class Qwen3(nn.Module):
         cos, sin = _rope_cache(cfg, device="cpu")
         self.register_buffer("rope_cos", cos, persistent=False)
         self.register_buffer("rope_sin", sin, persistent=False)
+        # Qwen3-style init (initializer_range=0.02); from_pretrained overwrites.
+        for mod in self.modules():
+            if isinstance(mod, nn.Linear):
+                nn.init.normal_(mod.weight, std=0.02)
+            elif isinstance(mod, nn.Embedding):
+                nn.init.normal_(mod.weight, std=0.02)
+        if cfg.tie_word_embeddings:
+            self.lm_head.weight = self.embed_tokens.weight
 
     def forward(
         self,
