@@ -118,7 +118,10 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
 def eval_sweep(ckpts: str = "base,/results/live_lr3e-5/ckpt_000600.pt,"
                             "/results/live_lr1e-4/ckpt_000600.pt,"
                             "/results/live_lr3e-4/ckpt_000600.pt"):
-    for r in eval_ckpt.map(ckpts.split(",")):
+    for r in eval_ckpt.map(ckpts.split(","), return_exceptions=True):
+        if isinstance(r, Exception):
+            print("FAILED:", str(r)[:200])
+            continue
         print(r.get("ckpt"), "gsm8k", r.get("gsm8k_acc"),
               {s: round(v["committed_per_round"], 3) for s, v in r["acceptance"].items()})
 
@@ -145,6 +148,20 @@ def sweep2(steps: int = 1000):
         f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "
         f"--out-dir /results/live2_lr{lr}_ntp{w} --steps {steps} --batch-size 8 "
         f"--T 2048 --lr {lr} --w-ntp {w} --eval-every 200 --save-every 500"
+        for lr, w in arms
+    ]
+    for rc in train.map(argvs):
+        print("exit:", rc)
+
+
+@app.local_entrypoint()
+def final06b(steps: int = 3000):
+    arms = [("3e-5", "0.1"), ("1e-5", "0.1")]
+    argvs = [
+        f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "
+        f"--out-dir /results/final06b_lr{lr} --steps {steps} --batch-size 8 "
+        f"--T 2048 --lr {lr} --w-ntp {w} --markov-rank 256 "
+        f"--eval-every 200 --save-every 500"
         for lr, w in arms
     ]
     for rc in train.map(argvs):
