@@ -171,11 +171,19 @@ def fig_4b_vs_dspark():
     if not p.exists():
         return
     rows = [r for r in load_jsonl(p) if r.get("ckpt")]
-    ar = {r["B"]: r["tok_s"] for r in rows if r["mode"] == "ar"}
-    ours = {}
+    # best-of-repeats per config (repeated grids; max removes interference noise)
+    ar = {}
+    for r in rows:
+        if r["mode"] == "ar":
+            ar[r["B"]] = max(ar.get(r["B"], 0), r["tok_s"])
+    best = {}
     for r in rows:
         if r["mode"] == "spec" and r["B"] in ar:
-            ours.setdefault(r["k"], {})[r["B"]] = r["tok_s"] / ar[r["B"]]
+            key = (r["k"], r["B"])
+            best[key] = max(best.get(key, 0), r["tok_s"])
+    ours = {}
+    for (k, B), v in best.items():
+        ours.setdefault(k, {})[B] = v / ar[B]
 
     fig, ax = plt.subplots(figsize=(7.5, 5))
     Bs = sorted(set(base) & set(dsp))

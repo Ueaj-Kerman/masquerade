@@ -1,0 +1,24 @@
+# PrimeIntellect Hosted Training (prime train run configs/len_budget/hosted_rl.toml)
+# Prereqs: prime login; prime train models (verify Qwen3-4B availability);
+#          prime env push -v PRIVATE from environments/math_len_budget
+name = "qwen3-4b-len-budget"
+model = "Qwen/Qwen3-4B-Instruct-2507"   # fallback: Qwen/Qwen3.5-4B
+max_steps = 300
+batch_size = 256
+rollouts_per_example = 8
+
+[sampling]
+max_tokens = 4096
+temperature = 1.0
+
+[[env]]
+id = "OWNER/math-len-budget"            # set after prime env push
+args = { p_lax = 0.3 }
+
+[wandb]
+project = "len-budget"
+
+[checkpoints]
+interval = 100
+[adapters]
+interval = 100
