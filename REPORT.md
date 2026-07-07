@@ -154,3 +154,26 @@ Position-1 conditional acceptance 0.905 (gsm8k) — matching DSpark's ~0.89 with
 no separate drafter. Protocol note: DSpark numbers at temp 1.0; temp-1.0 eval
 of the fused 4B in flight (0.6B showed ~14% tau reduction from greedy).
 Training curve (val_agree): 0.49@200 -> 0.60@2400, still rising.
+
+## Stage 5 final (interrupted by host power failures, see post-mortem)
+
+Matched-token val loss (50m scale, fineweb, aurora recipe, NTP measured
+identically in both arms):
+- 28M tok: ntp ~4.61 (interp) vs ntp+mask 4.557
+- 42M tok: ntp ~4.36 (interp) vs ntp+mask 4.349 | wtv0.1 4.346 | wtv0.4 (14M only)
+- 169M tok: ntp 3.956* (v2 arm crashed there) — full ntp curve to 967M: 3.469
+The mask objective shows a small consistent advantage at matched tokens in the
+regime tested (<=170M); Chinchilla-scale budgets were cut short by two host
+power failures. Markov-in-pretraining arm reached only 14M tokens (5.171 vs
+plain mask 5.187 at 14M — inconclusive). 30m scale (GB10): ntp arm completed
+147M tokens; mask arm lost to the final crash.
+
+## Post-mortem: three hard power-loss events
+
+Windows Kernel-Power 41 + EventLog 6008 at 04:57, 05:18, 12:44 UTC — all under
+sustained ~99% RTX 5090 load. Signature of PSU overcurrent trips on 5090
+transient spikes (or 12V-2x6 connector margin), not software. Recovery worked
+via Modal volume background commits (fused_4b_v2 ckpt_002500 survived) and
+local checkpoints; ~7h of the window was lost to the third outage.
+Recommendation: reseat GPU power, cap power for overnight runs
+(nvidia-smi -pl 450), consider ATX3.1 PSU headroom.
