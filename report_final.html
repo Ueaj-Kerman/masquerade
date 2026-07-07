@@ -199,7 +199,19 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
     <tr><td>Markov head ON</td><td>5.36</td><td>3.42</td><td>4.10</td></tr>
     <tr><td>Markov head OFF</td><td>5.31</td><td>3.42</td><td>4.08</td></tr>
   </table></div>
-  <p><strong>Verdict: the sequential head is redundant on a fused drafter.</strong>
+  <div class="tablewrap"><table>
+    <tr><th>4B, same weights (muP-hot head)</th><th>&tau; gsm8k</th><th>&tau; chat</th><th>&tau; code</th></tr>
+    <tr><td>head ON</td><td class="hl">6.77</td><td>3.94</td><td>5.38</td></tr>
+    <tr><td>head OFF</td><td>3.84</td><td>2.94</td><td>3.61</td></tr>
+  </table></div>
+  <p><strong>Final verdict (inverted by the muP fix): the head is load-bearing —
+  when trained at embedding-scale lr it carries ~+3 &tau; on GSM8K.</strong> The
+  0.6B numbers above (5.36 vs 5.31) were an undertraining artifact: at body-lr
+  1e-5 with N(0, 0.02) init the head never moved. With W1&sim;N(0,1) and its own
+  lr 1e-3, a division of labor emerges — mask slots learn context, the head
+  handles local sequential correction.</p>
+  <p class="mono" style="color: var(--muted); font-size: 0.85rem">Earlier same-weights ablation (undertrained head, kept for the record):</p>
+  <p style="display:none"><strong>Verdict: the sequential head is redundant on a fused drafter.</strong>
   DSpark&rsquo;s Markov block compensates for a shallow 5-layer drafter backbone;
   masquerade&rsquo;s drafts already flow through all 28 layers of the target, so the
   low-rank bigram correction adds &le;0.05 &tau;. This answers the stage-4

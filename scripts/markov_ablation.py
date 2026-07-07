@@ -15,6 +15,9 @@ MODEL_DIR = "/mnt/d/hf_cache/hub/models--Qwen--Qwen3-0.6B/snapshots/c1899de289a0
 
 def main():
     ckpt = sys.argv[1] if len(sys.argv) > 1 else "results/final06b_lr1e-5.pt"
+    global MODEL_DIR
+    if len(sys.argv) > 2:
+        MODEL_DIR = sys.argv[2]
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL_DIR)

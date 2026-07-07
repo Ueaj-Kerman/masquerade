@@ -136,7 +136,16 @@ comes from training, not machinery. Engine finding: SDPA reads the whole
 preallocated cache, so cache sizing matters (AR B=1 122->264 tok/s when
 2048->768 slots); vLLM-style paging is the obvious next step.
 
-## Stage 4 REVISED (user's muP catch): the head was undertrained, not useless
+## Stage 4 FINAL (4B same-weights on/off, muP-hot head)
+
+τ head-ON 6.77 / 3.94 / 5.38 (gsm8k/chat/code) vs head-OFF 3.84 / 2.94 / 3.61
+— the properly-trained sequential head carries ~+3 τ on gsm8k. Division of
+labor emerges: trained under a working head, mask slots specialize on context
+and the head on local sequential correction (head-off τ is BELOW the cold-head
+run's 6.68 where the body did everything). The morning's "head is useless"
+verdict was purely an undertraining artifact.
+
+## Stage 4 earlier revision (user's muP catch): the head was undertrained, not useless
 
 Hot markov (W1 init N(0,1), separate lr 1e-3 = 100x body, wd 0), same lr1e-5
 recipe: **τ gsm8k 5.27 -> 5.95** (+0.68), code 4.29 -> 4.52, chat 3.38 -> 3.45;
