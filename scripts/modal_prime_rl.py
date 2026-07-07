@@ -13,7 +13,7 @@ image = (
     .apt_install("git", "curl", "build-essential")
     .run_commands(
         "curl -LsSf https://astral.sh/uv/install.sh | sh",
-        "git clone --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
+        "git clone --recurse-submodules --shallow-submodules --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
         "cd /prime-rl && /root/.local/bin/uv sync --no-dev 2>&1 | tail -3",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "WANDB_MODE": "offline"})
