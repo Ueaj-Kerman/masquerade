@@ -78,7 +78,11 @@ def main():
     # flat so argmax flips are expected — bound relative error + agreement
     assert rel < 5e-2 and agree > 0.95
 
-    # throughput: fwd+bwd step time, CP on vs off (rank-local timing)
+    del ref, out_l, out_full
+    torch.cuda.empty_cache()
+
+    # throughput: fwd+bwd step time, CP on vs off (rank-local timing).
+    # loss on hidden states — full-vocab logits at T=8192 would dominate memory.
     m.requires_grad_(True)
     def step(cp: bool):
         ids_s, pos_s = ids.clone(), pos.clone()
@@ -87,11 +91,11 @@ def main():
         for _ in range(5):
             if cp:
                 with context_parallel(mesh, buffers=[ids_s, pos_s], buffer_seq_dims=[1, 1]):
-                    out = m(ids_s, positions=pos_s)
-                    out.float().pow(2).mean().backward()
+                    h = m(ids_s, positions=pos_s, return_hidden=True)
+                    h.float().pow(2).mean().backward()
             else:
-                out = m(ids, positions=pos)
-                out.float().pow(2).mean().backward()
+                h = m(ids, positions=pos, return_hidden=True)
+                h.float().pow(2).mean().backward()
             m.zero_grad(set_to_none=True)
         torch.cuda.synchronize()
         return (time.perf_counter() - t0) / 5

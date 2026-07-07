@@ -132,7 +132,7 @@ def stage5(arms: str = "50m:ntp:15000,50m:ntp+mask:15000,124m:ntp:11500,124m:ntp
     for arm in arms.split(","):
         preset, obj, steps = arm.split(":")
         bs = 64 if preset == "124m" else 32
-        name = f"{preset}_{obj.replace('+', '_')}"
+        name = f"{preset}_{obj.replace('+', '_')}_v2"
         argvs.append(
             f"--preset {preset} --objective {obj} --optimizer aurora --steps {steps} "
             f"--batch-size {bs} --T 2048 --compile --attn flex --data /data/fineweb "
@@ -176,7 +176,7 @@ def final06b(steps: int = 3000):
     arms = [("3e-5", "0.1"), ("1e-5", "0.1"), ("1e-4", "0.1")]
     argvs = [
         f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "
-        f"--out-dir /results/final06b_lr{lr} --steps {steps} --batch-size 8 "
+        f"--out-dir /results/final06b_v2_lr{lr} --steps {steps} --batch-size 8 "
         f"--T 2048 --lr {lr} --w-ntp {w} --markov-rank 256 "
         f"--eval-every 200 --save-every 500"
         for lr, w in arms
