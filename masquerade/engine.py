@@ -158,6 +158,67 @@ class Engine:
         self.n_rounds += 1
         self.n_forwards += 2
 
+    # ---------------- fused round (B=1 latency path, greedy) ----------------
+    @torch.no_grad()
+    def fused_step(self, carry, eos_id: int):
+        """Verify + draft in one forward.
+
+        carry None (no valid drafts): draft fwd [last@L-1, M*k] gives `nxt`
+          (exact, position L) + drafts for L+1..L+k; then the fused verify
+          [nxt@L, d@L+1..L+k, M@L+k+1..L+2k] commits a+2 tokens (2 forwards).
+        carry (bonus, d') from a fully-accepted previous fused forward: the
+          chain starts at the already-committed bonus@L-1:
+          [bonus@L-1, d'@L..L+k-1, M@L+k..L+2k-1] commits a+1 tokens (1 fwd).
+        Either way, on full acceptance the appended masks yield next drafts.
+        """
+        B, k = self.B, self.k
+        assert B == 1 and self.temperature == 0.0
+        ar1 = torch.arange(k + 1, device="cuda")
+        masks = torch.full((B, k), self.mask_id, device="cuda", dtype=torch.long)
+        if carry is None:
+            last = self.tokens.gather(1, (self.L - 1)[:, None])
+            lg = self._fwd(torch.cat([last, masks], 1), (self.L - 1)[:, None] + ar1[None])
+            lgf = lg.float(); lgf[..., self.mask_id] = float("-inf")
+            nxt = lgf[:, 0].argmax(-1)
+            drafts = lgf[:, 1:].argmax(-1)
+            self.n_forwards += 1
+            head, base = nxt, self.L            # chain starts at pos L (uncached, uncommitted head)
+            n_extra = 2                          # commits = a + head + bonus
+        else:
+            head, drafts = carry                 # head = bonus, already committed at L-1
+            base = self.L - 1
+            n_extra = 1
+        vin = torch.cat([head[:, None], drafts, masks], 1)
+        pos = base[:, None] + torch.arange(2 * k + 1, device="cuda")[None]
+        lg = self._fwd(vin, pos)
+        lgf = lg.float(); lgf[..., self.mask_id] = float("-inf")
+        exact = lgf[:, : k + 1].argmax(-1)
+        match = drafts == exact[:, :k]
+        a = torch.cumprod(match.long(), 1).sum(1)
+        bonus = exact.gather(1, a[:, None]).squeeze(1)
+        if carry is None:
+            commit = torch.cat([head[:, None], drafts, bonus[:, None]], 1)   # [B,k+2]
+            commit.scatter_(1, (a + 1)[:, None], bonus[:, None])
+        else:
+            commit = torch.cat([drafts, bonus[:, None]], 1)                  # [B,k+1]
+            commit.scatter_(1, a[:, None], bonus[:, None])
+        W = commit.shape[1]
+        n_new = torch.where(self.done, torch.zeros_like(a), a + n_extra)
+        idx = (self.L[:, None] + torch.arange(W, device="cuda")[None]).clamp(max=self.S - 1)
+        write = torch.arange(W, device="cuda")[None] < n_new[:, None]
+        self.tokens.scatter_(1, idx, torch.where(write, commit, self.tokens.gather(1, idx)))
+        self.L = (self.L + n_new).clamp(max=self.S - 1)
+        self.done |= ((commit == eos_id) & write).any(1)
+        act = ~self.done
+        self.acc_hist.scatter_add_(0, a, act.long())
+        self.pos_reach += ((ar1[None, :k] < (a[:, None] + 1)) & act[:, None]).sum(0)
+        self.pos_accept += ((ar1[None, :k] < a[:, None]) & act[:, None]).sum(0)
+        self.n_rounds += 1
+        self.n_forwards += 1
+        if bool((a == k).item()) and not bool(self.done.item()):
+            return (bonus, lgf[:, k + 1:].argmax(-1))
+        return None
+
     # ---------------- AR baseline ----------------
     @torch.no_grad()
     def ar_step(self, eos_id: int):
@@ -182,13 +243,16 @@ class Engine:
         import time
         t0 = time.perf_counter()
         it = 0
+        carry = None
         while True:
             if mode == "spec":
                 self.spec_round(eos_id)
+            elif mode == "spec_fused":
+                carry = self.fused_step(carry, eos_id)
             else:
                 self.ar_step(eos_id)
             it += 1
-            if it % sync_every == 0:
+            if mode == "spec_fused" or it % sync_every == 0:
                 if bool((self.done | (self.L >= limit)).all()):
                     break
         torch.cuda.synchronize()

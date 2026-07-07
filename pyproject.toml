@@ -10,6 +10,7 @@ dependencies = [
     "matplotlib>=3.11.0",
     "numpy>=2.5.1",
     "safetensors>=0.8.0",
+    "tiktoken>=0.13.0",
     "torch>=2.12.1",
     "transformers>=5.13.0",
 ]

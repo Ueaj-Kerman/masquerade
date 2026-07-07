@@ -16,7 +16,9 @@ app = modal.App("masquerade-dspark-repro")
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    .uv_pip_install("vllm==0.24.0", "hf_transfer")
+    .uv_pip_install("vllm", "hf_transfer",
+                    extra_index_url="https://wheels.vllm.ai/nightly",
+                    extra_options="--prerelease=allow --index-strategy unsafe-best-match")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "VLLM_USE_FLASHINFER_SAMPLER": "0"})
 )
 
@@ -68,24 +70,31 @@ def spec_metrics(llm):
         return {"error": str(e)}
 
 
+SPEC_CONFIGS = {
+    "base": None,
+    "dspark": {"method": "dspark", "model": "deepseek-ai/dspark_qwen3_4b_block7",
+               "num_speculative_tokens": 7},
+    "dflash": {"method": "dflash", "model": "deepseek-ai/dflash_qwen3_4b_block7",
+               "num_speculative_tokens": 7},
+    "eagle3": {"method": "eagle3", "model": "deepseek-ai/eagle3_qwen3_4b_ttt7",
+               "num_speculative_tokens": 7},
+}
+
+
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 3,
               volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
-def bench(spec: bool):
+def bench(algo: str):
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
 
+    spec = SPEC_CONFIGS[algo] is not None
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
     prompts = build_prompts(tok)
 
     kwargs = dict(model="Qwen/Qwen3-4B", dtype="bfloat16", max_model_len=4096,
                   gpu_memory_utilization=0.85, enable_prefix_caching=False)
     if spec:
-        kwargs["speculative_config"] = {
-            "method": "dspark",
-            "model": "deepseek-ai/dspark_qwen3_4b_block7",
-            "num_speculative_tokens": 7,
-            "draft_sample_method": "probabilistic",
-        }
+        kwargs["speculative_config"] = SPEC_CONFIGS[algo]
     llm = LLM(**kwargs)
     sp = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=MAX_NEW)
 
@@ -101,14 +110,14 @@ def bench(spec: bool):
             dt = time.perf_counter() - t0
             m1 = spec_metrics(llm) if spec else {}
             ntok = sum(len(o.outputs[0].token_ids) for o in outs)
-            rec = {"set": name, "B": B, "spec": spec, "wall_s": dt,
+            rec = {"set": name, "B": B, "algo": algo, "wall_s": dt,
                    "gen_tokens": ntok, "tok_s": ntok / dt,
                    "tok_s_per_seq": ntok / dt / B,
                    "metrics_before": m0, "metrics_after": m1}
             results.append(rec)
-            print(json.dumps({k: rec[k] for k in ("set", "B", "spec", "tok_s", "tok_s_per_seq")}))
+            print(json.dumps({k: rec[k] for k in ("set", "B", "algo", "tok_s", "tok_s_per_seq")}))
 
-    fname = f"/results/dspark_repro_{'spec' if spec else 'base'}.json"
+    fname = f"/results/dspark_repro_{algo}.json"
     with open(fname, "w") as f:
         json.dump(results, f, indent=2)
     vol.commit()
@@ -116,6 +125,6 @@ def bench(spec: bool):
 
 
 @app.local_entrypoint()
-def main():
-    for r in bench.map([False, True]):
+def main(algos: str = "base,dspark,dflash,eagle3"):
+    for r in bench.map(algos.split(",")):
         print("saved:", r)
