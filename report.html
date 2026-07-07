@@ -301,7 +301,11 @@
   forward per round on full acceptance: 3.41 tok/fwd, 2.72&times; at B=1) recovers
   much of the gap; a batched fused mode and vLLM-grade paging are the obvious
   next steps. Flagship (hot-head) checkpoint: AR 103 &rarr; k=8 237 tok/s at B=1,
-  548 at B=8.</figcaption></figure>
+  548 at B=8, ~437 held at B=16&ndash;32. Caveats: best-of-2 repeated runs (the
+  k=8/B=4 dip is reproducible — a slow shape in our engine, as is DSpark&rsquo;s own
+  B=2 dip in theirs); our AR baseline saturates past B=8 on the 32&thinsp;GB card,
+  which flatters the B&ge;16 ratios — at high batch read the absolute spec
+  throughput, not the ratio.</figcaption></figure>
 
   <h3>4B on the local RTX 5090 (bf16, lr3e-5 ckpt, greedy, mixed prompts)</h3>
   <p>AR 103 tok/s &rarr; k=4 192 (1.86&times;, &tau; 5.02) &rarr; k=8 <strong>222 tok/s
