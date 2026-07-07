@@ -28,16 +28,13 @@ res_vol = modal.Volume.from_name("masquerade-results", create_if_missing=True)
 hf_cache = modal.Volume.from_name("masquerade-hf-cache", create_if_missing=True)
 
 
-@app.function(image=image, gpu="H100", timeout=60 * 60 * 6,
-              volumes={"/data": data_vol, "/results": res_vol,
-                       "/root/.cache/huggingface": hf_cache})
-def train(argv: str, module: str = "masquerade.train_fused"):
+def _train(argv: str, module: str, model: str):
     import subprocess
     import sys
 
     from huggingface_hub import snapshot_download
 
-    mdir = snapshot_download("Qwen/Qwen3-0.6B")
+    mdir = snapshot_download(model)
     cmd = [sys.executable, "-m", module, "--model-dir", mdir] + shlex.split(argv)
     print("RUN:", " ".join(cmd), flush=True)
     r = subprocess.run(cmd, cwd="/repo")
@@ -45,9 +42,25 @@ def train(argv: str, module: str = "masquerade.train_fused"):
     return r.returncode
 
 
+@app.function(image=image, gpu="H100", timeout=60 * 60 * 6,
+              volumes={"/data": data_vol, "/results": res_vol,
+                       "/root/.cache/huggingface": hf_cache})
+def train(argv: str, module: str = "masquerade.train_fused", model: str = "Qwen/Qwen3-0.6B"):
+    return _train(argv, module, model)
+
+
+@app.function(image=image, gpu="H200", timeout=60 * 60 * 8,
+              volumes={"/data": data_vol, "/results": res_vol,
+                       "/root/.cache/huggingface": hf_cache})
+def train_big(argv: str, module: str = "masquerade.train_fused", model: str = "Qwen/Qwen3-4B"):
+    return _train(argv, module, model)
+
+
 @app.local_entrypoint()
-def main(args: str = "", module: str = "masquerade.train_fused"):
-    rc = train.remote(args, module)
+def main(args: str = "", module: str = "masquerade.train_fused",
+         model: str = "Qwen/Qwen3-0.6B", big: bool = False):
+    fn = train_big if big else train
+    rc = fn.remote(args, module, model)
     print("exit:", rc)
 
 

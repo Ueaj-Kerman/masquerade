@@ -16,9 +16,17 @@ app = modal.App("masquerade-dspark-repro")
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    .uv_pip_install("vllm", "hf_transfer",
-                    extra_index_url="https://wheels.vllm.ai/nightly",
-                    extra_options="--prerelease=allow --index-strategy unsafe-best-match")
+    .uv_pip_install("vllm==0.24.0", "hf_transfer")
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "VLLM_USE_FLASHINFER_SAMPLER": "0"})
+)
+
+# dspark support merged into vllm main on Jul 2 2026 (PR #47093), not yet in a
+# release; source-install with precompiled binaries for the dspark arm only.
+image_main = (
+    modal.Image.debian_slim(python_version="3.12")
+    .apt_install("git")
+    .env({"VLLM_USE_PRECOMPILED": "1"})
+    .uv_pip_install("git+https://github.com/vllm-project/vllm@main", "hf_transfer")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "VLLM_USE_FLASHINFER_SAMPLER": "0"})
 )
 
@@ -81,9 +89,7 @@ SPEC_CONFIGS = {
 }
 
 
-@app.function(image=image, gpu="H100", timeout=60 * 60 * 3,
-              volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
-def bench(algo: str):
+def _bench_impl(algo: str):
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
 
@@ -124,7 +130,24 @@ def bench(algo: str):
     return fname
 
 
+@app.function(image=image, gpu="H100", timeout=60 * 60 * 3,
+              volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
+def bench(algo: str):
+    return _bench_impl(algo)
+
+
+@app.function(image=image_main, gpu="H100", timeout=60 * 60 * 3,
+              volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
+def bench_main(algo: str):
+    return _bench_impl(algo)
+
+
 @app.local_entrypoint()
-def main(algos: str = "base,dspark,dflash,eagle3"):
-    for r in bench.map(algos.split(",")):
-        print("saved:", r)
+def main(algos: str = "base,dflash,eagle3"):
+    calls = [bench.spawn(a) for a in algos.split(",")]
+    calls.append(bench_main.spawn("dspark"))
+    for c in calls:
+        try:
+            print("saved:", c.get())
+        except Exception as e:
+            print("FAILED:", type(e).__name__, str(e)[:400])
