@@ -82,13 +82,13 @@
   or rejects — provably lossless under greedy decoding.</p>
 
   <div class="statrow">
-    <div class="stat"><div class="v">&tau; 5.27</div>
-      <div class="l">accepted tokens/round on GSM8K (Qwen3-0.6B, k=8) — 93% of DSpark&rsquo;s
-      dedicated-1B-drafter &tau; on a 7&times; larger target</div></div>
+    <div class="stat"><div class="v">&tau; 5.65 = DSpark</div>
+      <div class="l">accepted tokens/round, Qwen3-4B GSM8K temp 1.0 — identical to DSpark&rsquo;s
+      separate-1B-drafter 5.64, with no drafter at all</div></div>
     <div class="stat"><div class="v g">62.5% = base</div>
       <div class="l">GSM8K after training — zero base-capability loss (lr 1e-5 recipe)</div></div>
-    <div class="stat"><div class="v">1.90&times;</div>
-      <div class="l">lossless wall-clock speedup at B=1 on an RTX 5090 (232 vs 122 tok/s)</div></div>
+    <div class="stat"><div class="v">1.98&times;</div>
+      <div class="l">lossless wall-clock speedup, GSM8K B=1 on an RTX 5090 (533 vs 269 tok/s, fused decode)</div></div>
     <div class="stat"><div class="v">+1 row</div>
       <div class="l">parameter overhead: one embedding row (+ optional rank-256 Markov head)</div></div>
   </div>
