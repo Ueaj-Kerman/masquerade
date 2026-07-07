@@ -82,6 +82,18 @@ def run(args):
             teacher = teacher.to(torch.bfloat16)
         teacher.requires_grad_(False).eval()
 
+    markov = None
+    if args.markov_rank > 0:
+        # DSpark-style low-rank sequential head: bias(prev_token) added to mask
+        # logits; W2 zero-init so training starts from the parallel drafter.
+        V = student.cfg.vocab_size
+        markov = torch.nn.ModuleDict({
+            "w1": torch.nn.Embedding(V, args.markov_rank),
+            "w2": torch.nn.Linear(args.markov_rank, V, bias=False),
+        }).to(device=device, dtype=torch.float32)
+        torch.nn.init.normal_(markov["w1"].weight, std=0.02)
+        torch.nn.init.zeros_(markov["w2"].weight)
+
     if args.grad_ckpt and not args.tiny:
         from torch.utils.checkpoint import checkpoint
         for blk in student.layers:
@@ -104,7 +116,10 @@ def run(args):
     val_batches = [val_packer.build(vseqs[j:j + args.batch_size])
                    for j in range(0, max(len(vseqs) - args.batch_size + 1, 1), args.batch_size)][:4]
 
-    opt = torch.optim.AdamW(student.parameters(), lr=args.lr, betas=(0.9, 0.95),
+    params = list(student.parameters())
+    if markov is not None:
+        params += list(markov.parameters())
+    opt = torch.optim.AdamW(params, lr=args.lr, betas=(0.9, 0.95),
                             eps=1e-6, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda st: min(1.0, (st + 1) / args.warmup)
@@ -129,6 +144,9 @@ def run(args):
             sl = student.lm_head(hs).float()
             tm = teacher if args.teacher == "frozen" else student
             tl = tm.lm_head(ht).float()
+        if markov is not None:
+            prev = batch.ids.to(device).gather(1, batch.teacher_idx.to(device))
+            sl = sl + markov["w2"](markov["w1"](prev)).float()
         s_lp = F.log_softmax(sl, -1)
         t_lp = F.log_softmax(tl, -1)
         pt, ps = t_lp.exp(), s_lp.exp()
@@ -188,6 +206,9 @@ def run(args):
         if step % args.save_every == 0 or step == args.steps:
             sd = {k: v.to(torch.bfloat16) for k, v in student.state_dict().items()
                   if not k.startswith("rope_")}
+            if markov is not None:
+                sd.update({f"markov.{k}": v.to(torch.bfloat16)
+                           for k, v in markov.state_dict().items()})
             torch.save(sd, out_dir / f"ckpt_{step:06d}.pt")
 
 
@@ -205,6 +226,7 @@ def build_parser():
     ap.add_argument("--region-every", type=int, default=48)
     ap.add_argument("--max-pairs", type=int, default=256)
     ap.add_argument("--n-ntp", type=int, default=64, help="NTP positions per row")
+    ap.add_argument("--markov-rank", type=int, default=0, help="sequential head rank (0=off)")
     ap.add_argument("--max-samples", type=int, default=None)
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--wd", type=float, default=0.1)

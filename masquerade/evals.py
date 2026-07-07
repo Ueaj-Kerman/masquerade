@@ -85,14 +85,28 @@ def extract_answer(text: str):
         return None
 
 
+def load_ckpt_into(model: Qwen3, ckpt_path, device="cuda"):
+    """Load a masquerade ckpt; returns optional markov (w1, w2) tensors."""
+    sd = torch.load(ckpt_path, map_location=device, weights_only=True)
+    markov = None
+    if "markov.w1.weight" in sd:
+        markov = (sd.pop("markov.w1.weight").to(device).float(),
+                  sd.pop("markov.w2.weight").to(device).float())
+    missing, unexpected = model.load_state_dict(sd, strict=False)
+    assert not unexpected, unexpected
+    model.lm_head.weight = model.embed_tokens.weight
+    return markov
+
+
 @torch.no_grad()
 def bench_acceptance(model: Qwen3, tok, k: int = 8, batch: int = 16, max_new: int = 256,
                      n_prompts: int = 64, temperature: float = 0.0,
-                     compile_mode: str | None = "reduce-overhead", sets: tuple = ("gsm8k", "chat", "code")):
+                     compile_mode: str | None = "reduce-overhead", sets: tuple = ("gsm8k", "chat", "code"),
+                     markov=None):
     """DSpark-style acceptance metrics per prompt category."""
     out = {}
     eng = Engine(model, batch=batch, max_len=2048, k=k, compile_mode=compile_mode,
-                 temperature=temperature)
+                 temperature=temperature, markov=markov)
     for name in sets:
         if name == "gsm8k":
             qs, _ = load_gsm8k(n_prompts)
@@ -128,11 +142,12 @@ def bench_acceptance(model: Qwen3, tok, k: int = 8, batch: int = 16, max_new: in
 
 @torch.no_grad()
 def gsm8k_accuracy(model: Qwen3, tok, n: int = 128, batch: int = 16, max_new: int = 512,
-                   compile_mode: str | None = None):
+                   compile_mode: str | None = None, markov=None):
     qs, answers = load_gsm8k(n)
     qs = [q + "\nPlease reason step by step, and put your final answer within \\boxed{}." for q in qs]
     prompts = encode_chat(tok, qs)
-    eng = Engine(model, batch=batch, max_len=2048, k=4, compile_mode=compile_mode, temperature=0.0)
+    eng = Engine(model, batch=batch, max_len=2048, k=4, compile_mode=compile_mode,
+                 temperature=0.0, markov=markov)
     correct, total = 0, 0
     for i in range(0, len(prompts), batch):
         chunk = prompts[i:i + batch]

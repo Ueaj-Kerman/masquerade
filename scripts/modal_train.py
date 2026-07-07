@@ -142,6 +142,19 @@ def stage5(arms: str = "50m:ntp:15000,50m:ntp+mask:15000,124m:ntp:11500,124m:ntp
 
 
 @app.local_entrypoint()
+def sweep2(steps: int = 1000):
+    arms = [("3e-5", "0.1"), ("1e-4", "0.2"), ("1e-4", "0.5"), ("3e-4", "0.5")]
+    argvs = [
+        f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "
+        f"--out-dir /results/live2_lr{lr}_ntp{w} --steps {steps} --batch-size 8 "
+        f"--T 2048 --lr {lr} --w-ntp {w} --eval-every 200 --save-every 500"
+        for lr, w in arms
+    ]
+    for rc in train.map(argvs):
+        print("exit:", rc)
+
+
+@app.local_entrypoint()
 def sweep_live_lr(steps: int = 500, lrs: str = "3e-5,1e-4,3e-4"):
     argvs = [
         f"--teacher live --attn dense --data /data/regen_qwen3_0.6b.jsonl "

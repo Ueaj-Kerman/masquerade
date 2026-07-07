@@ -15,14 +15,11 @@ MODEL_DIR = "/mnt/d/hf_cache/hub/models--Qwen--Qwen3-0.6B/snapshots/c1899de289a0
 
 
 def load_ckpt(model_dir, ckpt_path=None):
+    from masquerade.evals import load_ckpt_into
+
     m = Qwen3.from_pretrained(model_dir)
-    if ckpt_path:
-        sd = torch.load(ckpt_path, map_location="cuda", weights_only=True)
-        missing, unexpected = m.load_state_dict(sd, strict=False)
-        assert not unexpected, unexpected
-        assert all(k.startswith("rope_") or k == "lm_head.weight" for k in missing), missing
-        m.lm_head.weight = m.embed_tokens.weight
-    return m
+    markov = load_ckpt_into(m, ckpt_path) if ckpt_path else None
+    return m, markov
 
 
 def main():
@@ -59,12 +56,12 @@ def main():
         if step in done_steps:
             print(f"skip step {step} (done)")
             continue
-        m = load_ckpt(args.model_dir, ck)
+        m, markov = load_ckpt(args.model_dir, ck)
         rec = {"step": step}
         rec["acceptance"] = bench_acceptance(m, tok, k=args.k, n_prompts=args.n_prompts,
-                                             max_new=args.max_new)
+                                             max_new=args.max_new, markov=markov)
         if not args.no_gsm:
-            rec.update(gsm8k_accuracy(m, tok, n=args.gsm_n))
+            rec.update(gsm8k_accuracy(m, tok, n=args.gsm_n, markov=markov))
         print(json.dumps(rec, indent=None), flush=True)
         with out_path.open("a") as f:
             f.write(json.dumps(rec) + "\n")

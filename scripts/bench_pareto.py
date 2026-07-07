@@ -34,11 +34,10 @@ def main():
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(args.model_dir)
+    from masquerade.evals import load_ckpt_into
+
     model = Qwen3.from_pretrained(args.model_dir)
-    if args.ckpt:
-        sd = torch.load(args.ckpt, map_location="cuda", weights_only=True)
-        model.load_state_dict(sd, strict=False)
-        model.lm_head.weight = model.embed_tokens.weight
+    markov = load_ckpt_into(model, args.ckpt) if args.ckpt else None
 
     gsm, _ = load_gsm8k(64)
     gsm = [q + "\nPlease reason step by step, and put your final answer within \\boxed{}." for q in gsm]
@@ -56,7 +55,7 @@ def main():
 
     def bench(mode, k, B):
         eng = Engine(model, batch=B, max_len=2048, k=k, compile_mode=cm,
-                     temperature=args.temperature)
+                     temperature=args.temperature, markov=markov)
         chunk = (prompts * ((B // len(prompts)) + 1))[:B]
         eng.generate(chunk, max_new=32, eos_id=eos, mode=mode)  # warmup/compile
         eng.generate(chunk, max_new=32, eos_id=eos, mode=mode)

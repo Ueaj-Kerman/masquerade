@@ -27,8 +27,9 @@ MASK_ID = 151935
 class Engine:
     def __init__(self, model: Qwen3, batch: int, max_len: int, k: int = 8,
                  mask_id: int = MASK_ID, compile_mode: str | None = "reduce-overhead",
-                 temperature: float = 0.0, seed: int = 0):
+                 temperature: float = 0.0, seed: int = 0, markov=None):
         self.m = model.eval()
+        self.markov = markov  # (w1 [V,r], w2 [V,r]) -> bias = w1[prev] @ w2.T
         self.B, self.S, self.k = batch, max_len, k
         self.mask_id = mask_id
         self.temperature = temperature
@@ -73,6 +74,25 @@ class Engine:
         tok = torch.multinomial(flat, 1, generator=self.gen).view(p.shape[:-1])
         return tok, p
 
+    def _draft_sweep(self, mask_logits, first_prev):
+        """Serial Markov-conditioned draft sampling over k mask positions.
+        mask_logits [B,k,V], first_prev [B] (token before position 0's target).
+        Returns drafts [B,k], draft probs [B,k,V] or None."""
+        if self.markov is None:
+            return self._sample(mask_logits)
+        w1, w2 = self.markov
+        B, k, V = mask_logits.shape
+        drafts, probs = [], []
+        prev = first_prev
+        for j in range(k):
+            bias = (w1[prev].to(w2.dtype) @ w2.T).float()
+            tok, p = self._sample(mask_logits[:, j] + bias)
+            drafts.append(tok)
+            probs.append(p)
+            prev = tok
+        drafts = torch.stack(drafts, 1)
+        return drafts, (torch.stack(probs, 1) if probs[0] is not None else None)
+
     # ---------------- prefill ----------------
     @torch.no_grad()
     def prefill(self, prompts: list[torch.Tensor]):
@@ -112,7 +132,7 @@ class Engine:
         pos1 = (self.L - 1)[:, None] + arange_k1[None]                 # [B,k+1]
         lg1 = self._fwd(drin, pos1)                                    # [B,k+1,V]
         nxt, p_next = self._sample(lg1[:, 0])                          # commit
-        drafts, p_draft = self._sample(lg1[:, 1:])                     # [B,k]
+        drafts, p_draft = self._draft_sweep(lg1[:, 1:].float(), nxt)   # [B,k]
 
         vin = torch.cat([nxt[:, None], drafts], 1)                     # [B,k+1]
         pos2 = self.L[:, None] + arange_k1[None]
@@ -186,7 +206,7 @@ class Engine:
             lg = self._fwd(torch.cat([last, masks], 1), (self.L - 1)[:, None] + ar1[None])
             lgf = lg.float(); lgf[..., self.mask_id] = float("-inf")
             nxt = lgf[:, 0].argmax(-1)
-            drafts = lgf[:, 1:].argmax(-1)
+            drafts, _ = self._draft_sweep(lgf[:, 1:], nxt)
             self.n_forwards += 1
             head, base = nxt, self.L            # chain starts at pos L (uncached, uncommitted head)
             n_extra = 2                          # commits = a + head + bonus
@@ -222,7 +242,8 @@ class Engine:
         self.n_rounds += 1
         self.n_forwards += 1
         if bool((a == k).item()) and not bool(self.done.item()):
-            return (bonus, lgf[:, k + 1:].argmax(-1))
+            nd, _ = self._draft_sweep(lgf[:, k + 1:], bonus)
+            return (bonus, nd)
         return None
 
     # ---------------- AR baseline ----------------
