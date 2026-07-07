@@ -68,14 +68,22 @@ Markov head) reaches τ 5.27 on GSM8K at UNCHANGED base accuracy — 93% of
 DSpark's dedicated-1B-drafter τ (5.64) measured on Qwen3-4B, from a 0.6B model
 and ~1.5h of H100 training. The lr dial traces a quality/acceptance pareto.
 
-## Stage 1: frozen-teacher, single region (0.6B local)
+## Stage 1: frozen-teacher, single region (0.6B local, lr 1e-4, anchor-KL 1.0)
 
-val mask-slot argmax agreement vs steps (lr 1e-4, anchor-KL 1.0):
+val mask-slot argmax agreement vs steps:
 125: 0.232 | 250: 0.258 | 500: 0.303 | 750: 0.333 | 1000: 0.323 | 1250: 0.343 |
-1500: 0.372 | 1750: 0.380 — still climbing at 2.5k steps; single-region signal
-is ~20x sparser per forward than the fused multi-region trainer, which reaches
-0.40+ by step 300. Position-1 agreement 0.62 by step 1750.
-(engine acceptance + GSM8K per checkpoint: pending)
+1500: 0.372 | 1750: 0.380 | 2000: 0.392 | 2500: 0.406 — still climbing; the
+single-region signal is ~20x sparser per forward than the fused multi-region
+trainer (0.40+ by step 300). Position-1 agreement 0.64 at the end.
+
+Quality finding: at lr 1e-4 the model develops REPETITION LOOPS in long
+generations almost immediately (GSM8K 59-62% -> 1.6% by step 250, partial
+recovery to ~16% by 2500; failure mode = never concluding: "Step 7... Step 8
+..." or "x 2 x 2 x 2..." until the token cap; short-horizon samples look
+clean). Engine verified exactly lossless in fp32 with trained ckpts (tau 4.38),
+and AR==spec accuracy in bf16 — the damage is in the weights, not the decoder.
+The final fused recipe at lr 1e-5 shows ZERO damage (62.5% GSM8K at tau 5.27):
+drift (lr x steps), not the mask objective itself, is what breaks quality.
 
 ## Stage 2b: packing / compile / context parallel
 

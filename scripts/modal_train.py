@@ -115,6 +115,13 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
 
 
 @app.local_entrypoint()
+def eval_one(ckpt: str = "base", model: str = "Qwen/Qwen3-0.6B"):
+    r = eval_ckpt.remote(ckpt, model=model)
+    print(r.get("ckpt"), "gsm8k", r.get("gsm8k_acc"),
+          {s: round(v["committed_per_round"], 3) for s, v in r["acceptance"].items()})
+
+
+@app.local_entrypoint()
 def eval_sweep(ckpts: str = "base,/results/live_lr3e-5/ckpt_000600.pt,"
                             "/results/live_lr1e-4/ckpt_000600.pt,"
                             "/results/live_lr3e-4/ckpt_000600.pt"):
