@@ -229,3 +229,10 @@ strict "every token counts" -> 136.5 avg tokens, tau 5.92 | default -> 291.2,
 2.3x density with only -6% tau. RL plan: verifiers env with prompt-conditioned
 lambda (environments/math_len_budget), self-run prime-rl on Modal 2xH100
 (hosted catalog lacks Qwen3-4B; Qwen3.5 only). Smoke in flight.
+
+## Stage 1 reproduced with muP recipe (frozen teacher, lr 1e-5 + hot head/row)
+
+step: 250 -> 2500 | tau gsm8k 4.25 -> 5.37 (chat 2.76->3.04, code 3.21->4.03)
+GSM8K stays 0.49-0.62 all run (base 0.625, n=128) — NO quality crater.
+Training val_agree 0.517@750 vs original 0.333@750. The stage-1 failure was
+parameterization, not the objective.

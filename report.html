@@ -203,6 +203,14 @@
   weight-space problem, not a decoder bug: AR and spec accuracies match. The fix is
   the drift dial, not the objective: the final recipe at lr 1e-5 has zero loss.</figcaption></figure>
 
+  <figure><img src="figs/acceptance_stage1_mup.png" alt="stage-1 reproduced with the muP recipe">
+  <figcaption><strong>Stage 1 reproduced with the fixed recipe</strong> (body lr
+  1e-5, muP-hot Markov head 1e-3, hot [MASK] row 1e-2): &tau; on GSM8K climbs
+  4.25 &rarr; 5.37 while GSM8K accuracy stays in the base-level noise band the
+  entire run — no crater, no repetition loops. The simple demonstrator works
+  cleanly once the parameterization is right, reaching with a frozen teacher
+  what the first fused runs needed live distillation for.</figcaption></figure>
+
   <h2>Stages 2&ndash;3 — live self-distillation, fused &amp; multi-region</h2>
   <p>The final trainer packs documents, inserts many mask groups per sequence, and
   gets teacher and student from <em>one forward</em> — the real-token stream is
