@@ -191,6 +191,7 @@ def main():
     ap.add_argument("--k-max", type=int, default=8)
     ap.add_argument("--region-every", type=int, default=64)
     ap.add_argument("--attn", default="dense", choices=["dense", "flex"])
+    ap.add_argument("--markov-rank", type=int, default=0)
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out-dir", required=True)
@@ -218,11 +219,23 @@ def main():
                                region_every=args.region_every, max_pairs=512, seed=args.seed)
     use_mask = args.objective == "ntp+mask"
 
+    markov = None
+    if args.markov_rank > 0:
+        markov = torch.nn.ModuleDict({
+            "w1": torch.nn.Embedding(cfg.vocab_size, args.markov_rank),
+            "w2": torch.nn.Linear(args.markov_rank, cfg.vocab_size, bias=False),
+        }).cuda().float()
+        torch.nn.init.normal_(markov["w1"].weight, std=0.02)
+        torch.nn.init.zeros_(markov["w2"].weight)
+
     lr = args.lr or (0.02 if args.optimizer == "aurora" else 3e-3)
     if args.optimizer == "aurora":
         opt = AuroraWrap(model, lr=lr, adamw_lr=args.adamw_lr)
+        if markov is not None:
+            opt.adamw.add_param_group({"params": list(markov.parameters())})
     else:
-        opt = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.95),
+        params = list(model.parameters()) + (list(markov.parameters()) if markov else [])
+        opt = torch.optim.AdamW(params, lr=lr, betas=(0.9, 0.95),
                                 eps=1e-8, weight_decay=0.1)
 
     def lr_scale(step):
@@ -293,6 +306,9 @@ def main():
                 sl = model.lm_head(hs).float()
                 with torch.no_grad():  # full teacher stop-grad (tied lm_head)
                     tl = model.lm_head(ht).float()
+            if markov is not None:
+                prev = pb.ids.cuda().gather(1, pb.teacher_idx.cuda())
+                sl = sl + markov["w2"](markov["w1"](prev)).float()
             pw = pb.pair_w.cuda(); den = pw.sum().clamp(min=1e-6)
             tv = (0.5 * (tl.softmax(-1) - sl.softmax(-1)).abs().sum(-1) * pw).sum() / den
             pce = (F.cross_entropy(sl.flatten(0, 1), pb.hard_labels.cuda().flatten(),
