@@ -156,6 +156,47 @@ def fig_pretrain():
     print("wrote pretrain fig")
 
 
+def fig_4b_vs_dspark():
+    """Relative speedup vs own-AR baseline per batch: DSpark (vLLM/H100, temp 1.0)
+    vs masquerade-4B (our engine/RTX 5090, greedy), GSM8K prompts."""
+    import json as _j
+    try:
+        base = {r["B"]: r["tok_s"] for r in
+                _j.load(open(ROOT / "results/dspark_repro_base.json")) if r["set"] == "gsm8k"}
+        dsp = {r["B"]: r["tok_s"] for r in
+               _j.load(open(ROOT / "results/dspark_repro_dspark.json")) if r["set"] == "gsm8k"}
+    except FileNotFoundError:
+        return
+    p = ROOT / "results/pareto_4b_hot.jsonl"
+    if not p.exists():
+        return
+    rows = [r for r in load_jsonl(p) if r.get("ckpt")]
+    ar = {r["B"]: r["tok_s"] for r in rows if r["mode"] == "ar"}
+    ours = {}
+    for r in rows:
+        if r["mode"] == "spec" and r["B"] in ar:
+            ours.setdefault(r["k"], {})[r["B"]] = r["tok_s"] / ar[r["B"]]
+
+    fig, ax = plt.subplots(figsize=(7.5, 5))
+    Bs = sorted(set(base) & set(dsp))
+    ax.plot(Bs, [dsp[b] / base[b] for b in Bs], marker="s", color=C["dspark"],
+            label="DSpark (vLLM, H100, temp 1.0)", lw=2)
+    for k in sorted(ours):
+        d = ours[k]
+        Bs2 = sorted(d)
+        ax.plot(Bs2, [d[b] for b in Bs2], marker="o",
+                color=CAT[0] if k == 8 else CAT[1],
+                label=f"masquerade k={k} (our engine, RTX 5090, greedy)", lw=2)
+    ax.axhline(1.0, color=GRAY, lw=1, ls=":")
+    ax.set(xlabel="batch size (concurrency)", ylabel="speedup vs own AR baseline",
+           xscale="log", title="Qwen3-4B GSM8K: lossless speedup vs batch")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(FIGS / "speedup_4b_vs_dspark.png", dpi=150)
+    plt.close(fig)
+    print("wrote speedup_4b_vs_dspark")
+
+
 def fig_train_agree(runs: dict | None = None):
     """val_agree vs step across training runs (stage1 local + modal logs)."""
     if runs is None:
@@ -193,3 +234,5 @@ if __name__ == "__main__":
         fig_pretrain()
     if which in ("all", "train"):
         fig_train_agree()
+    if which in ("all", "4b"):
+        fig_4b_vs_dspark()
