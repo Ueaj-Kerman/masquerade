@@ -15,6 +15,11 @@ Wall-clock speedup vs vanilla vLLM (same engine, same hardware):
 Qualitatively reproduces the paper: math >> chat acceptance; speedup decays
 with concurrency (the motivation for their confidence scheduler). Baseline
 throughput at B=64: 9.7k (gsm8k) / 11.3k (chat) tok/s; DSpark: 18.7k / 14.1k.
+
+Acceptance counters (vLLM ground truth, k=7): τ = 1 + accepted/drafts:
+gsm8k **τ 5.64** (paper 6.11), chat **τ 3.28** (paper MT-Bench 3.64) —
+92%/90% of published, consistent given differing prompt sets. Per-position
+conditional acceptance ≈ 0.89 flat (gsm8k), ≈ 0.71 flat (chat).
 DFlash/EAGLE-3 DeepSpec checkpoints declare arch names no released vLLM build
 loads (`DFlashQwen3DSparkModel`, `Qwen3Eagle3Model`); paper Table 1 provides
 those baselines instead.
@@ -35,9 +40,20 @@ Key finding: pure live self-distillation trades base quality for acceptance;
 τ→k+1 in the collapse limit. Mitigation: hard-label NTP CE on real slots
 (w_ntp) — sweep 2 (with anchor) below.
 
-## Stage 2a+4 sweep 2 (0.6B, 1000 steps, w_ntp anchor)
+## Stage 2a sweep 2 (0.6B, 1000 steps, w_ntp anchor)
 
-(pending eval)
+| arm | GSM8K | τ gsm8k | τ chat | τ code |
+|---|---|---|---|---|
+| 3e-5 + ntp0.1 | 43.8% | 5.08 | 3.93 | 4.27 |
+| 1e-4 + ntp0.2 | 26.6% | 5.34 | 4.79 | 4.64 |
+| 1e-4 + ntp0.5 | 31.3% | 5.07 | 3.66 | 4.84 |
+| 3e-4 + ntp0.5 | 4.7%  | 5.19 | 5.46 | 5.94 |
+
+The NTP anchor prevents outright collapse (3e-4 arm keeps τ~5.5 instead of
+degenerate 9.0) and buys acceptance at fixed quality for 3e-5 (τ gsm8k
+4.67→5.08 vs sweep-1 at same 43.8% GSM8K). Fused 0.6B τ within ~10% of
+DSpark's dedicated-1B-drafter-on-4B τ, at 1000 training steps.
+Final runs (3000 steps + Markov head r=256): lr 3e-5 and 1e-5, pending.
 
 ## Stage 1: frozen-teacher, single region (0.6B local)
 

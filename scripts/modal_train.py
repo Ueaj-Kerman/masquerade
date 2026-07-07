@@ -154,6 +154,22 @@ def sweep2(steps: int = 1000):
         print("exit:", rc)
 
 
+@app.function(image=image, gpu="H100:2", timeout=60 * 30,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
+              volumes={"/root/.cache/huggingface": hf_cache})
+def cp_demo():
+    import subprocess
+
+    r = subprocess.run(["torchrun", "--nproc-per-node", "2", "scripts/cp_demo.py"],
+                       cwd="/repo")
+    return r.returncode
+
+
+@app.local_entrypoint()
+def run_cp_demo():
+    print("exit:", cp_demo.remote())
+
+
 @app.local_entrypoint()
 def final06b(steps: int = 3000):
     arms = [("3e-5", "0.1"), ("1e-5", "0.1")]
