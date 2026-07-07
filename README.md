@@ -1,0 +1,57 @@
+# masquerade
+
+**Fused self-speculative decoding via mask-token self-distillation.**
+
+DSpark/DFlash/EAGLE train a *separate* drafter next to the target model.
+Masquerade fuses the drafter into the target itself: run the model over a
+sequence with a masked region and without, and distill the unmasked (exact NTP)
+logits into the masked forward. At inference, append `[MASK]` tokens to draft
+many future tokens in one forward of the *full* model, then verify losslessly —
+no extra parameters beyond one embedding row, drafting at full base-model
+capacity.
+
+## Method
+
+Training (final form — one forward, multi-region, doc-packed):
+
+```
+[ctx tokens][M M M][region tokens][ctx][M M][region] ...
+```
+
+- k masks inserted *before* each region, carrying the region's rope positions
+- real tokens attend only to real tokens → the real stream IS the teacher
+  (bit-identical to a plain forward; proven in tests/test_multiregion.py)
+- masks attend to prior real context + earlier masks of their own region only
+- loss: position-decayed TV + hard CE at mask slots, distilled from stop-grad
+  real-slot logits (live weights = self-distillation, no reference model);
+  optional NTP CE at real slots (pretraining objective / stabilizer)
+
+Inference (masquerade/engine.py): static KV cache, per-row cache-length
+visibility masks, compiled with CUDA graphs.
+
+- two-phase: draft fwd `[last, M*k]` -> exact next + k drafts; verify fwd
+  commits `accepted + 2` tokens/round; batched lockstep, shape-static
+- fused (B=1): `[next, d_1..d_k, M*k]` — verification and next-block drafting
+  in the same forward; on full acceptance 1 fwd commits k+1 tokens
+- greedy mode is exactly lossless vs greedy AR (fp32-verified); temperature
+  mode uses standard speculative rejection sampling
+
+## Stages (increasing capability)
+
+1. `masquerade/train.py --teacher frozen` — single region/sample, frozen
+   original weights as teacher, two forwards
+2. `--teacher live` — live self-distillation (no reference model)
+3. `masquerade/train_fused.py` — doc packing + multi-region single-forward
+   (attention trick), torch.compile, flex or dense attention
+4. (optional) DSpark-style sequential head on top
+5. `scripts/pretrain.py` — from-scratch NTP vs NTP+mask at multiple scales,
+   aurora (Tilde) or AdamW recipes
+
+## Repro anchors
+
+- DSpark (DeepSeek, Jun 2026): Qwen3-4B `dspark_qwen3_4b_block7` via vLLM,
+  plus DFlash and EAGLE-3 baselines — `scripts/modal_dspark_repro.py`
+- Data recipe follows DSpark: Open-PerfectBlend prompts, responses regenerated
+  by the target model in non-thinking mode (`scripts/regen_data.py`)
+- Metrics follow DSpark: accepted length per round (τ incl. bonus token),
+  position-wise conditional acceptance, throughput-vs-concurrency pareto

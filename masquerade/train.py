@@ -119,9 +119,8 @@ def run(args):
             stats["agree"].append(ag[valid].mean().item())
             for j in range(args.k_max):
                 v = valid[:, j]
-                if v.any():
-                    stats["agree_pos"][j] += ag[v.cpu().nonzero().squeeze(-1), j].sum().cpu()
-                    stats["cnt_pos"][j] += v.sum().cpu()
+                stats["agree_pos"][j] += ag[:, j][v].sum().cpu()
+                stats["cnt_pos"][j] += v.sum().cpu()
             pt, ps = tl.softmax(-1), sl.softmax(-1)
             tv = 0.5 * (pt - ps).abs().sum(-1)
             stats["tv"].append(tv[valid].mean().item())

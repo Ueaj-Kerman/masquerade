@@ -43,6 +43,7 @@ def _train(argv: str, module: str, model: str):
 
 
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 6,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/data": data_vol, "/results": res_vol,
                        "/root/.cache/huggingface": hf_cache})
 def train(argv: str, module: str = "masquerade.train_fused", model: str = "Qwen/Qwen3-0.6B"):
@@ -50,6 +51,7 @@ def train(argv: str, module: str = "masquerade.train_fused", model: str = "Qwen/
 
 
 @app.function(image=image, gpu="H200", timeout=60 * 60 * 8,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/data": data_vol, "/results": res_vol,
                        "/root/.cache/huggingface": hf_cache})
 def train_big(argv: str, module: str = "masquerade.train_fused", model: str = "Qwen/Qwen3-4B"):

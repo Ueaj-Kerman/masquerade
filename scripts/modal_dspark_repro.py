@@ -131,12 +131,14 @@ def _bench_impl(algo: str):
 
 
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 3,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
 def bench(algo: str):
     return _bench_impl(algo)
 
 
 @app.function(image=image_main, gpu="H100", timeout=60 * 60 * 3,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
 def bench_main(algo: str):
     return _bench_impl(algo)

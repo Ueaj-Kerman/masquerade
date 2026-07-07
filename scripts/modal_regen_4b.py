@@ -18,6 +18,7 @@ hf_cache = modal.Volume.from_name("masquerade-hf-cache", create_if_missing=True)
 
 
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 4,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/data": data_vol, "/root/.cache/huggingface": hf_cache})
 def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl"):
     from datasets import load_dataset
