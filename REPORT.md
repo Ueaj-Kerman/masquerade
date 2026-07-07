@@ -136,7 +136,17 @@ comes from training, not machinery. Engine finding: SDPA reads the whole
 preallocated cache, so cache sizing matters (AR B=1 122->264 tok/s when
 2048->768 slots); vLLM-style paging is the obvious next step.
 
-## Stage 4 verdict: Markov head adds ~nothing on a fused drafter
+## Stage 4 REVISED (user's muP catch): the head was undertrained, not useless
+
+Hot markov (W1 init N(0,1), separate lr 1e-3 = 100x body, wd 0), same lr1e-5
+recipe: **τ gsm8k 5.27 -> 5.95** (+0.68), code 4.29 -> 4.52, chat 3.38 -> 3.45;
+train agreement 0.506 -> 0.653. GSM8K 57.8% vs 62.5% (n=128, borderline noise;
+note the head cannot alter outputs — verification is lossless — so any quality
+delta is body-drift via reshaped mask-loss gradients). Lesson recorded: check a
+component actually TRAINED (muP scaling for embedding-like params) before
+concluding it's redundant.
+
+## Stage 4 original verdict (pre-muP-fix): Markov head adds ~nothing on a fused drafter
 
 Same weights, head on vs off at inference: τ gsm8k 5.36 vs 5.31, chat/code
 within noise. Training-side ablation (identical recipe, no head): val_agree
