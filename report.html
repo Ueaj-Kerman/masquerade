@@ -176,9 +176,18 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
   compute-bound — mirroring the DSpark production curves.</figcaption></figure>
 
   <div class="tablewrap"><table id="pareto-table">
-    <tr><th>B</th><th>AR tok/s</th><th>k=2</th><th>k=4</th><th>k=8</th><th>best speedup</th></tr>
-    <tr><td colspan="6" class="mono">(filled at publish)</td></tr>
+    <tr><th>B</th><th>AR tok/s</th><th>k=4</th><th>k=8</th><th>best speedup</th></tr>
+    <tr><td>1</td><td>264</td><td>406</td><td>427</td><td class="hl">1.62&times;</td></tr>
+    <tr><td>4</td><td>361</td><td>474</td><td>419</td><td>1.31&times;</td></tr>
+    <tr><td>8</td><td>346</td><td>455</td><td>361</td><td>1.31&times;</td></tr>
+    <tr><td>16</td><td>705</td><td>788</td><td>760</td><td>1.12&times;</td></tr>
+    <tr><td>32</td><td>1088</td><td>1383</td><td>1346</td><td>1.27&times;</td></tr>
   </table></div>
+  <p>The fused decode mode (verify + next draft in one forward when the previous
+  round fully accepts) lifts B=1 GSM8K decoding to <strong>533 tok/s vs 269
+  AR — 1.98&times; lossless</strong> at 2.74 tokens/forward. Control: spec with
+  UNTRAINED masks is <em>slower</em> than AR (233 vs 255) — the speedup comes
+  from training, not machinery.</p>
 
   <h2>Stage 4 — DSpark-style Markov head</h2>
   <p>A rank-256 sequential head (<code>bias = W2&middot;W1[prev token]</code>, zero-initialized)
@@ -186,16 +195,25 @@ decode (static KV cache, CUDA graphs; per-row cache-length visibility):
   logits-only sweep — same trick as DSpark&rsquo;s sequential block, at negligible decode
   cost. An ablation arm (same recipe, head off) isolates its contribution.</p>
   <div class="tablewrap"><table id="markov-table">
-    <tr><th>variant</th><th>GSM8K</th><th>&tau; gsm8k</th><th>&tau; chat</th><th>&tau; code</th></tr>
-    <tr><td colspan="5" class="mono">(ablation finishing at publish)</td></tr>
+    <tr><th>variant (same weights)</th><th>&tau; gsm8k</th><th>&tau; chat</th><th>&tau; code</th></tr>
+    <tr><td>Markov head ON</td><td>5.36</td><td>3.42</td><td>4.10</td></tr>
+    <tr><td>Markov head OFF</td><td>5.31</td><td>3.42</td><td>4.08</td></tr>
   </table></div>
+  <p><strong>Verdict: the sequential head is redundant on a fused drafter.</strong>
+  DSpark&rsquo;s Markov block compensates for a shallow 5-layer drafter backbone;
+  masquerade&rsquo;s drafts already flow through all 28 layers of the target, so the
+  low-rank bigram correction adds &le;0.05 &tau;. This answers the stage-4
+  question: the fused objective alone already provides the pareto improvement
+  the sequential block was meant to rescue.</p>
 
   <h2>Scaling to Qwen3-4B — head-to-head with DSpark</h2>
   <div class="tablewrap"><table id="table-4b">
     <tr><th>system</th><th>drafter params</th><th>GSM8K</th><th>&tau; gsm8k</th><th>&tau; chat</th></tr>
     <tr><td>Qwen3-4B base</td><td>—</td><td>89.1%</td><td>2.03 (floor)</td><td>2.01</td></tr>
-    <tr><td>+ DSpark (repro)</td><td>~1B separate</td><td>lossless</td><td>5.64</td><td>3.28</td></tr>
-    <tr><td colspan="5" class="mono">(masquerade-4B rows land at publish)</td></tr>
+    <tr><td>+ DSpark (repro, temp 1.0)</td><td>~1B separate</td><td>lossless</td><td>5.64</td><td>3.28</td></tr>
+    <tr><td>+ masquerade lr3e-5 (temp 1.0)</td><td class="good">fused, +1 row</td><td>82.0%</td><td class="hl">5.65</td><td class="hl">3.43</td></tr>
+    <tr><td>+ masquerade lr3e-5 (greedy)</td><td class="good">fused, +1 row</td><td>82.0%</td><td>6.68</td><td>3.78</td></tr>
+    <tr><td>+ masquerade lr1e-5 (training at publish)</td><td>fused, +1 row</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
   </table></div>
 
   <h2>Stage 5 — masked pretraining (NTP + mask from scratch)</h2>
