@@ -14,7 +14,7 @@ image = (
     .run_commands(
         "curl -LsSf https://astral.sh/uv/install.sh | sh",
         "git config --global url.https://github.com/.insteadOf git@github.com:",
-        "git clone --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
+        "git clone --branch v0.6.1.dev57 --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
         "cd /prime-rl && git submodule update --init --depth 1",
         "cd /prime-rl && /root/.local/bin/uv sync --no-dev --extra flash-attn",
         "ls /prime-rl/.venv/bin | grep -E '^(rl|python)' && /prime-rl/.venv/bin/python -c 'import flash_attn; print(flash_attn.__version__)'",
