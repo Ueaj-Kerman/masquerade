@@ -187,6 +187,10 @@ def fig_4b_vs_dspark():
         ax.plot(Bs2, [d[b] for b in Bs2], marker="o",
                 color=CAT[0] if k == 8 else CAT[1],
                 label=f"masquerade k={k} (our engine, RTX 5090, greedy)", lw=2)
+    ar1 = ar.get(1)
+    if ar1:
+        ax.plot([1], [278.9 / ar1], marker="*", ms=14, color=CAT[0],
+                label="masquerade fused decode (B=1)", ls="none")
     ax.axhline(1.0, color=GRAY, lw=1, ls=":")
     ax.set(xlabel="batch size (concurrency)", ylabel="speedup vs own AR baseline",
            xscale="log", title="Qwen3-4B GSM8K: lossless speedup vs batch")

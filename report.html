@@ -292,6 +292,17 @@
     <tr><td>+ same (greedy)</td><td>fused, +1 row</td><td>89.8%</td><td>6.93</td><td>3.76</td></tr>
   </table></div>
 
+  <figure><img src="figs/speedup_4b_vs_dspark.png" alt="Qwen3-4B speedup vs batch: DSpark vs masquerade">
+  <figcaption>Relative speedup vs each system&rsquo;s own AR baseline on GSM8K
+  (different engines/hardware/temperature — ratios, not absolute throughput).
+  Masquerade&rsquo;s &tau; is higher (6.78 vs 5.64) but each two-phase round costs TWO
+  full-model forwards where DSpark spends one target forward plus a ~25%-cost
+  drafter — the fundamental price of fusion. The fused decode mode (&#9733;, one
+  forward per round on full acceptance: 3.41 tok/fwd, 2.72&times; at B=1) recovers
+  much of the gap; a batched fused mode and vLLM-grade paging are the obvious
+  next steps. Flagship (hot-head) checkpoint: AR 103 &rarr; k=8 237 tok/s at B=1,
+  548 at B=8.</figcaption></figure>
+
   <h3>4B on the local RTX 5090 (bf16, lr3e-5 ckpt, greedy, mixed prompts)</h3>
   <p>AR 103 tok/s &rarr; k=4 192 (1.86&times;, &tau; 5.02) &rarr; k=8 <strong>222 tok/s
   (2.15&times; lossless, &tau; 6.30)</strong> at B=1 — a 4B model decoding above 220
