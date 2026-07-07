@@ -68,6 +68,9 @@ Markov head) reaches τ 5.27 on GSM8K at UNCHANGED base accuracy — 93% of
 DSpark's dedicated-1B-drafter τ (5.64) measured on Qwen3-4B, from a 0.6B model
 and ~1.5h of H100 training. The lr dial traces a quality/acceptance pareto.
 
+At DSpark's exact protocol (temperature 1.0), the lr1e-5 model: τ gsm8k 4.53 /
+chat 2.89 / code 3.64 (per-position acceptance ~0.73-0.77 vs DSpark's 0.89).
+
 ## Stage 1: frozen-teacher, single region (0.6B local, lr 1e-4, anchor-KL 1.0)
 
 val mask-slot argmax agreement vs steps:
