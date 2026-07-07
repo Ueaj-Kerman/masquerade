@@ -11,13 +11,15 @@ app = modal.App("masquerade-lenbudget-rl")
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu22.04", add_python="3.12")
     .apt_install("git", "curl", "build-essential")
+    .run_commands("curl -LsSf https://astral.sh/uv/install.sh | sh")
+    # the user's known-good prime-rl fork, deps vendored (no submodule roulette)
+    .add_local_dir("/home/devse/Projects/univerl2", "/prime-rl", copy=True,
+                   ignore=[".git", ".venv", "wandb", "outputs", "logs",
+                           "**/__pycache__", "**/*.pt", "**/*.safetensors"])
     .run_commands(
-        "curl -LsSf https://astral.sh/uv/install.sh | sh",
-        "git config --global url.https://github.com/.insteadOf git@github.com:",
-        "git clone --branch v0.6.1.dev57 --depth 1 https://github.com/PrimeIntellect-ai/prime-rl /prime-rl",
-        "cd /prime-rl && git submodule update --init --depth 1",
         "cd /prime-rl && /root/.local/bin/uv sync --no-dev --extra flash-attn",
-        "ls /prime-rl/.venv/bin | grep -E '^(rl|python)' && /prime-rl/.venv/bin/python -c 'import flash_attn; print(flash_attn.__version__)'",
+        "ls /prime-rl/.venv/bin | grep -cE 'rl|orchestrator' && "
+        "/prime-rl/.venv/bin/python -c 'import flash_attn' && echo VENVOK",
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "WANDB_MODE": "offline"})
     .add_local_dir("environments/math_len_budget", "/env/math_len_budget")
