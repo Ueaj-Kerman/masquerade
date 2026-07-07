@@ -87,6 +87,8 @@ clean). Engine verified exactly lossless in fp32 with trained ckpts (tau 4.38),
 and AR==spec accuracy in bf16 — the damage is in the weights, not the decoder.
 The final fused recipe at lr 1e-5 shows ZERO damage (62.5% GSM8K at tau 5.27):
 drift (lr x steps), not the mask objective itself, is what breaks quality.
+Confirmation: stage-1 rerun at lr 3e-5 reaches HIGHER agreement (0.366 vs
+0.333 at step 750) — gentler LR learns the draft task faster AND cleaner.
 
 ## Stage 2b: packing / compile / context parallel
 
@@ -137,9 +139,10 @@ preallocated cache, so cache sizing matters (AR B=1 122->264 tok/s when
 ## Stage 4 verdict: Markov head adds ~nothing on a fused drafter
 
 Same weights, head on vs off at inference: τ gsm8k 5.36 vs 5.31, chat/code
-within noise. DSpark's sequential head compensates for their shallow 5-layer
-drafter; a fused drafter already uses all 28 layers, so the low-rank bigram
-correction is redundant. (Training-side ablation arm pending.)
+within noise. Training-side ablation (identical recipe, no head): val_agree
+0.500 @1400 steps vs 0.499 with head — no difference there either. DSpark's
+sequential head compensates for their shallow 5-layer drafter; a fused drafter
+already uses all 28 layers, so the low-rank bigram correction is redundant.
 
 ## 4B fused (H200, live, w_ntp 0.1, markov r=256) — the DSpark head-to-head
 
