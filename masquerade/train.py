@@ -30,14 +30,15 @@ MASK_ID = 151935  # last (untrained) row of the Qwen3 vocab
 
 
 def gathered_logprobs(model, ids, positions, autocast=True):
-    with torch.autocast("cuda", torch.bfloat16, enabled=autocast):
+    dev = ids.device.type
+    with torch.autocast(dev, torch.bfloat16, enabled=autocast and dev == "cuda"):
         logits = model(ids, logit_positions=positions)
     return logits.float()
 
 
 def run(args):
     torch.manual_seed(args.seed)
-    device = "cuda"
+    device = args.device
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "args.json").write_text(json.dumps(vars(args), indent=2))
@@ -45,7 +46,13 @@ def run(args):
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(args.model_dir)
-    student = Qwen3.from_pretrained(args.model_dir, dtype=torch.float32)
+    if args.tiny:
+        from .qwen3 import Qwen3Config
+        cfg = Qwen3Config(hidden_size=64, intermediate_size=128, num_hidden_layers=2,
+                          num_attention_heads=4, num_key_value_heads=2, head_dim=16)
+        student = Qwen3(cfg).to(device=device, dtype=torch.float32)
+    else:
+        student = Qwen3.from_pretrained(args.model_dir, dtype=torch.float32, device=device)
     # init mask embedding to mean of real embeddings (untrained row otherwise)
     with torch.no_grad():
         emb = student.embed_tokens.weight
@@ -53,7 +60,10 @@ def run(args):
 
     teacher = None
     if args.teacher == "frozen":
-        teacher = Qwen3.from_pretrained(args.model_dir, dtype=torch.bfloat16)
+        if args.tiny:
+            teacher = copy.deepcopy(student).to(torch.bfloat16 if device == "cuda" else torch.float32)
+        else:
+            teacher = Qwen3.from_pretrained(args.model_dir, dtype=torch.bfloat16, device=device)
         teacher.requires_grad_(False).eval()
     elif args.teacher == "ema":
         teacher = copy.deepcopy(student).to(torch.bfloat16)
@@ -78,8 +88,9 @@ def run(args):
                         collate_fn=MaskCollator(mask_id=MASK_ID, k_max=args.k_max,
                                                 n_anchor=args.n_anchor))
 
+    # Qwen3 pretraining optimizer: AdamW b=(0.9,0.95) eps=1e-6 wd=0.1 clip=1.0
     opt = torch.optim.AdamW(student.parameters(), lr=args.lr, betas=(0.9, 0.95),
-                            weight_decay=args.wd)
+                            eps=1e-6, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda st: min(1.0, (st + 1) / args.warmup)
         * (0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * min(1.0, st / args.steps)))))
@@ -198,7 +209,7 @@ def build_parser():
     ap.add_argument("--k-max", type=int, default=8)
     ap.add_argument("--n-anchor", type=int, default=16)
     ap.add_argument("--lr", type=float, default=1e-4)
-    ap.add_argument("--wd", type=float, default=0.0)
+    ap.add_argument("--wd", type=float, default=0.1)
     ap.add_argument("--warmup", type=int, default=100)
     ap.add_argument("--w-tv", type=float, default=0.9)
     ap.add_argument("--w-ce", type=float, default=0.1)
@@ -213,6 +224,8 @@ def build_parser():
     ap.add_argument("--log-every", type=int, default=20)
     ap.add_argument("--eval-every", type=int, default=250)
     ap.add_argument("--save-every", type=int, default=500)
+    ap.add_argument("--device", default="cuda")
+    ap.add_argument("--tiny", action="store_true", help="random tiny model, CPU smoke test")
     return ap
 
 
