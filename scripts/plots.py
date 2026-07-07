@@ -70,7 +70,7 @@ def fig_acceptance_curves():
 
 
 def fig_pareto_local():
-    p = ROOT / "results/pareto_local.jsonl"
+    p = ROOT / "results/pareto_tight.jsonl"
     if not p.exists():
         return
     rows = load_jsonl(p)
@@ -89,10 +89,10 @@ def fig_pareto_local():
                     color=CAT[[4,8,12,2,6].index(k) % len(CAT)] if k in (2,4,6,8,12) else None,
                     label=f"masquerade k={k}", lw=2)
         ax.set(xlabel="batch size", ylabel="tokens/s (aggregate)", xscale="log",
-               title=f"throughput vs batch — {Path(tag).parent.name if tag != 'base' else 'base model'}")
+               title=f"throughput vs batch — {Path(tag).stem if tag != 'base' else 'base model'}")
         ax.legend()
         fig.tight_layout()
-        name = "base" if tag == "base" else Path(tag).parent.name + "_" + Path(tag).stem
+        name = "base" if tag == "base" else Path(tag).stem
         fig.savefig(FIGS / f"pareto_{name}.png", dpi=150)
         plt.close(fig)
         print("wrote pareto", name)
