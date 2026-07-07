@@ -142,6 +142,31 @@ def fig_pretrain():
     print("wrote pretrain fig")
 
 
+def fig_train_agree(runs: dict | None = None):
+    """val_agree vs step across training runs (stage1 local + modal logs)."""
+    if runs is None:
+        runs = {}
+        p = ROOT / "results/stage1_frozen/log.jsonl"
+        if p.exists():
+            runs["stage1 frozen (single-region)"] = p
+        for d in sorted(ROOT.glob("results/modal/*/log.jsonl")):
+            runs[d.parent.name] = d
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for name, p in runs.items():
+        rows = [r for r in load_jsonl(p) if "val_agree" in r]
+        if not rows:
+            continue
+        ax.plot([r["step"] for r in rows], [r["val_agree"] for r in rows],
+                marker="o", ms=3, label=name)
+    ax.set(xlabel="training step", ylabel="val mask-slot argmax agreement",
+           title="draft agreement vs training", ylim=(0, 1))
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(FIGS / "train_agree.png", dpi=150)
+    plt.close(fig)
+    print("wrote train_agree")
+
+
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     if which in ("all", "acc"):
@@ -152,3 +177,5 @@ if __name__ == "__main__":
         fig_dspark_repro()
     if which in ("all", "pretrain"):
         fig_pretrain()
+    if which in ("all", "train"):
+        fig_train_agree()

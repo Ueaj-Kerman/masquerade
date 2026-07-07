@@ -57,25 +57,27 @@ def main():
     dist.broadcast(ids, 0)
     pos = torch.arange(T, device="cuda").expand(B, T)
 
-    # reference: full forward on rank 0
+    # reference: full forward on rank 0 (hidden states — full-vocab logits at
+    # long T would dominate memory)
     with torch.no_grad():
-        ref = m(ids, positions=pos).float()
+        ref = m(ids, positions=pos, return_hidden=True).float()
 
     # CP forward: shard ids/pos along seq dim
     ids_l, pos_l = ids.clone(), pos.clone()
     with torch.no_grad(), context_parallel(mesh, buffers=[ids_l, pos_l],
                                            buffer_seq_dims=[1, 1]):
-        out_l = m(ids_l, positions=pos_l).float()
+        out_l = m(ids_l, positions=pos_l, return_hidden=True).float()
 
     # gather shards and compare (load-balanced sharding: 2*world chunks)
     from torch.distributed.tensor.experimental._attention import context_parallel_unshard
     (out_full,) = context_parallel_unshard(mesh, [out_l], [1])
     d = (out_full - ref).abs().max().item()
     rel = d / ref.abs().max().item()
-    agree = (out_full.argmax(-1) == ref.argmax(-1)).float().mean().item()
-    log(rank, f"CP forward: max abs diff {d:.4f} (rel {rel:.2e}), argmax agree {agree:.4f}")
-    # ring attention reorders bf16 accumulation; random-weight logits are near
-    # flat so argmax flips are expected — bound relative error + agreement
+    with torch.no_grad():
+        lg_ref = m.lm_head(ref[:, -256:].to(m.lm_head.weight.dtype)).argmax(-1)
+        lg_cp = m.lm_head(out_full[:, -256:].to(m.lm_head.weight.dtype)).argmax(-1)
+    agree = (lg_ref == lg_cp).float().mean().item()
+    log(rank, f"CP forward: hidden max abs {d:.4f} (rel {rel:.2e}), tail argmax agree {agree:.4f}")
     assert rel < 5e-2 and agree > 0.95
 
     del ref, out_l, out_full
