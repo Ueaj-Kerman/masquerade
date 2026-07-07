@@ -117,7 +117,16 @@ mask arm at 28M tokens): val loss 4.557 post-fix vs 4.580 leaky.
 B=1: AR 122 tok/s | k=2 172 (1.41x) | k=4 208 (1.71x) | k=8 **232 (1.90x, τ 4.57)**
 (batched rows pending; engine = compiled reduce-overhead CUDA graphs)
 
-## 4B fused (H200, live, lr 3e-5, w_ntp 0.1, 3000 steps)
+## 4B fused (H200, live, w_ntp 0.1, markov r=256) — the DSpark head-to-head
 
-step 100: mask agree 0.40 (vs 0.17 at step 20) — larger model learns the
-draft task much faster. (final eval pending)
+| system | drafter | GSM8K | τ gsm8k | τ chat | τ code |
+|---|---|---|---|---|---|
+| Qwen3-4B base | — | 89.1% | 2.03 (floor) | 2.01 | 2.03 |
+| + DSpark (repro, temp 1.0) | ~1B separate | lossless | 5.64 | 3.28 | — |
+| + masquerade lr3e-5 @2500 (greedy) | **fused, +1 row** | 82.0% | **6.68** | 3.78 | 5.17 |
+| + masquerade lr1e-5 (training) | fused | — | — | — | — |
+
+Position-1 conditional acceptance 0.905 (gsm8k) — matching DSpark's ~0.89 with
+no separate drafter. Protocol note: DSpark numbers at temp 1.0; temp-1.0 eval
+of the fused 4B in flight (0.6B showed ~14% tau reduction from greedy).
+Training curve (val_agree): 0.49@200 -> 0.60@2400, still rising.
