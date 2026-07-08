@@ -272,3 +272,15 @@ n=24/arm): strict 201 tok / 70.8% acc; unmarked 199 tok / 87.5%; lax 334 tok
 compression vs pre-RL while accuracy far above the pre-RL truncation regime.
 Strict over-compresses (70.8%) = the intended exploit/explore trade.
 Reward 0.08 -> 0.75; weights at /results/lenbudget_rl/outputs/weights/step_150.
+
+## RL'd-target 2x2 (thinking, t1.0) — staleness costs nothing
+
+| drafter        | non-RL'd target | RL'd target (no retrain)      |
+|----------------|-----------------|--------------------------------|
+| DSpark-tuned   | 4.01 / 2.17     | 4.06 / 2.16 (live hidden states)|
+| masquerade     | 5.18 / 3.43     | 5.26 / 3.44 (task-vector graft) |
+
+Graft = fused_think + (RL - base) applied to all 398 matched params; merged
+model keeps RL terseness (GSM8K 85.4% @1280 budget vs base-thinking ~54%
+truncation-limited) AND drafting. Dense RL traces marginally EASIER to draft.
+Retrained-drafter rows pending (regen from RL'd model running).
