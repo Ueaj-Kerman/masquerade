@@ -50,6 +50,16 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
     from masquerade.evals import extract_answer, load_gsm8k
     from masquerade.qwen3 import Qwen3
 
+    import shutil
+    from huggingface_hub import snapshot_download
+
+    if weights.startswith("/"):
+        base_cfg = json.load(open(snapshot_download("Qwen/Qwen3-4B") + "/config.json"))
+        work = "/tmp/rlw"
+        shutil.copytree(weights, work, dirs_exist_ok=True)
+        rl_cfg = json.load(open(work + "/config.json"))
+        json.dump({**base_cfg, **rl_cfg}, open(work + "/config.json", "w"))
+        weights = work
     tok = AutoTokenizer.from_pretrained(weights)
     m = Qwen3.from_pretrained(weights)
     qs, answers = load_gsm8k(n)

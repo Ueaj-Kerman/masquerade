@@ -176,6 +176,7 @@ def bench_think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
                 for q in ql]
     llm = LLM(model="Qwen/Qwen3-4B", dtype="bfloat16", max_model_len=4096,
               gpu_memory_utilization=0.85, enable_prefix_caching=False,
+              disable_log_stats=False,
               speculative_config={"method": "dspark", "model": ckpt,
                                   "num_speculative_tokens": 7})
     sp = SamplingParams(temperature=1.0, top_p=1.0, max_tokens=max_new)
