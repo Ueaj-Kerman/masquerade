@@ -284,3 +284,15 @@ Graft = fused_think + (RL - base) applied to all 398 matched params; merged
 model keeps RL terseness (GSM8K 85.4% @1280 budget vs base-thinking ~54%
 truncation-limited) AND drafting. Dense RL traces marginally EASIER to draft.
 Retrained-drafter rows pending (regen from RL'd model running).
+
+## Retrained-vs-graft verdict (fused drafter x RL'd base)
+
+tau: retrained 5.29/3.45/4.19 vs graft 5.26/3.44/4.18 — retraining buys +0.03.
+BUT quality: retrained GSM8K-thinking 47.9% vs graft 85.4% (1280 budget) —
+re-distillation on the RL model's own traces ERODED the RL terseness
+(re-lengthened traces -> truncation), while task-vector graft preserved it.
+Graft is strictly better: cheaper AND behavior-preserving.
+
+## 4-arm GSM8K (n=128, greedy, uncapped 8192)
+
+strict 204 tok / 93.0% | unmarked 233 / 94.5% | lax 355 / 94.5% | base: pending
