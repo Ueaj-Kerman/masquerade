@@ -251,3 +251,24 @@ Fused three-tier on 50k thinking regenerations (T=4096, 3000 steps H200):
   "stereotyped traces are easy" intuition.
 DSpark drafter on identical data: training (epoch 1/3). Length-penalty RL:
 step 68/150, reward 0.63-0.74.
+
+## Thinking-mode blog table (all temp 1.0, identical 50k thinking data)
+
+| model                  | tau gsm8k | tau chat | notes                    |
+|------------------------|-----------|----------|--------------------------|
+| base (no training)     | 2.03      | 2.01     | floor                    |
+| DSpark drafter (tuned) | 4.01      | 2.17     | speculators, 3 epochs, k=7, pos1 0.803 |
+| masquerade fused       | 5.18      | 3.43     | 3000 steps (~0.24 epoch = ~8% of dspark sample budget), k=8, pos1 0.836 |
+
+Ours +29% gsm8k / +58% chat over tuned DSpark on identical data (k differs
+8 vs 7; pos-1 comparison 0.836 vs 0.803 confirms the gap is real).
+Our trained speculators ckpt loads in vLLM main (Qwen3DSparkModel).
+
+## Length-penalty RL result (150 steps, 4B, thinking, ckpt saved)
+
+Pre-RL: traces ~3300 tok, 58% truncation at 3072 cap. Post-RL probe (t1.0,
+n=24/arm): strict 201 tok / 70.8% acc; unmarked 199 tok / 87.5%; lax 334 tok
+/ 87.5%. Conditioning trained in: lax 1.67x strict length; ~10-16x overall
+compression vs pre-RL while accuracy far above the pre-RL truncation regime.
+Strict over-compresses (70.8%) = the intended exploit/explore trade.
+Reward 0.08 -> 0.75; weights at /results/lenbudget_rl/outputs/weights/step_150.
