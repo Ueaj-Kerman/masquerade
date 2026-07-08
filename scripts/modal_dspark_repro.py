@@ -148,7 +148,8 @@ def bench_main(algo: str):
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": vol, "/root/.cache/huggingface": hf_cache})
 def bench_think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
-                max_new: int = 640, B: int = 8):
+                max_new: int = 640, B: int = 8,
+                target: str = "Qwen/Qwen3-4B", out_name: str = "dspark_think_tau"):
     """tau of a locally-trained speculators dspark ckpt, THINKING prompts, t1.0."""
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
@@ -174,7 +175,7 @@ def bench_think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
         return [tok.apply_chat_template([{"role": "user", "content": q}], tokenize=False,
                                         add_generation_prompt=True, enable_thinking=True)
                 for q in ql]
-    llm = LLM(model="Qwen/Qwen3-4B", dtype="bfloat16", max_model_len=4096,
+    llm = LLM(model=target, dtype="bfloat16", max_model_len=4096,
               gpu_memory_utilization=0.85, enable_prefix_caching=False,
               disable_log_stats=False,
               speculative_config={"method": "dspark", "model": ckpt,
@@ -188,15 +189,16 @@ def bench_think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
         m1 = spec_metrics(llm)
         results[name] = {"before": m0, "after": m1}
         print(json.dumps({name: {k: m1.get(k) for k in m1}}), flush=True)
-    with open("/results/dspark_think_tau.json", "w") as f:
+    with open(f"/results/{out_name}.json", "w") as f:
         json.dump(results, f, indent=2)
     vol.commit()
     return results
 
 
 @app.local_entrypoint()
-def think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best"):
-    print(bench_think.remote(ckpt))
+def think(ckpt: str = "/results/dspark_4b_thinking/checkpoint_best",
+          target: str = "Qwen/Qwen3-4B", out_name: str = "dspark_think_tau"):
+    print(bench_think.remote(ckpt, target=target, out_name=out_name))
 
 
 @app.local_entrypoint()
