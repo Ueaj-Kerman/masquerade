@@ -14,19 +14,31 @@ image = (
 )
 
 data_vol = modal.Volume.from_name("masquerade-data", create_if_missing=True)
+res_vol = modal.Volume.from_name("masquerade-results", create_if_missing=True)
 hf_cache = modal.Volume.from_name("masquerade-hf-cache", create_if_missing=True)
 
 
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 4,
               secrets=[modal.Secret.from_name("huggingface-secret")],
-              volumes={"/data": data_vol, "/root/.cache/huggingface": hf_cache})
+              volumes={"/data": data_vol, "/results": res_vol,
+                       "/root/.cache/huggingface": hf_cache})
 def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl",
-          thinking: bool = False):
+          thinking: bool = False, model: str = "Qwen/Qwen3-4B"):
     from datasets import load_dataset
     from transformers import AutoTokenizer
     from vllm import LLM, SamplingParams
 
-    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3-4B")
+    if model.startswith("/results"):
+        import json as _json
+        from huggingface_hub import snapshot_download as _sd
+        base_cfg = _json.load(open(_sd("Qwen/Qwen3-4B") + "/config.json"))
+        cfg_path = model + "/config.json"
+        cur = _json.load(open(cfg_path))
+        merged = {**base_cfg, **cur}
+        if merged != cur:
+            _json.dump(merged, open(cfg_path, "w"))
+            res_vol.commit()
+    tok = AutoTokenizer.from_pretrained(model)
     ds = load_dataset("mlabonne/open-perfectblend", split="train", streaming=True)
     prompts, raw = [], []
     for ex in ds:
@@ -46,7 +58,7 @@ def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_
             break
     print(f"collected {len(prompts)} prompts", flush=True)
 
-    llm = LLM(model="Qwen/Qwen3-4B", dtype="bfloat16", max_model_len=2048,
+    llm = LLM(model=model, dtype="bfloat16", max_model_len=2048,
               gpu_memory_utilization=0.9, seed=0)
     outs = llm.generate(prompts, SamplingParams(temperature=1.0, top_p=0.95,
                                                 max_tokens=max_tokens, seed=0))
@@ -63,5 +75,5 @@ def regen(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_
 
 @app.local_entrypoint()
 def main(n: int = 80_000, max_tokens: int = 512, out: str = "/data/regen_qwen3_4b.jsonl",
-         thinking: bool = False):
-    print("wrote:", regen.remote(n, max_tokens, out, thinking))
+         thinking: bool = False, model: str = "Qwen/Qwen3-4B"):
+    print("wrote:", regen.remote(n, max_tokens, out, thinking, model))
