@@ -34,7 +34,7 @@ def _train(argv: str, module: str, model: str):
 
     from huggingface_hub import snapshot_download
 
-    mdir = snapshot_download(model)
+    mdir = model if model.startswith("/") else snapshot_download(model)
     cmd = [sys.executable, "-m", module, "--model-dir", mdir] + shlex.split(argv)
     print("RUN:", " ".join(cmd), flush=True)
     r = subprocess.run(cmd, cwd="/repo")
@@ -99,7 +99,7 @@ def eval_ckpt(ckpt: str, model: str = "Qwen/Qwen3-0.6B", k: int = 8,
     from masquerade.evals import bench_acceptance, gsm8k_accuracy, load_ckpt_into
     from masquerade.qwen3 import Qwen3
 
-    mdir = snapshot_download(model)
+    mdir = model if model.startswith("/") else snapshot_download(model)
     tok = AutoTokenizer.from_pretrained(mdir)
     m = Qwen3.from_pretrained(mdir)
     markov = load_ckpt_into(m, ckpt) if ckpt != "base" else None

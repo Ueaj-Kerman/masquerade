@@ -37,7 +37,7 @@ LAYERS = "2 10 18 26 34"
               volumes={"/data": data_vol, "/results": res_vol,
                        "/root/.cache/huggingface": hf_cache})
 def train(data: str = "/data/regen_qwen3_4b_think.jsonl", epochs: int = 3,
-          model: str = "Qwen/Qwen3-4B"):
+          model: str = "Qwen/Qwen3-4B", out: str = "/results/dspark_4b_thinking"):
     import json
     import shutil
     import subprocess
@@ -102,12 +102,12 @@ def train(data: str = "/data/regen_qwen3_4b_think.jsonl", epochs: int = 3,
                                  "PATH": "/usr/local/bin:/usr/bin:/bin",
                                  "HOME": "/root"})
     srv.terminate()
-    shutil.copytree("/speculators/output/checkpoints",
-                    "/results/dspark_4b_thinking", dirs_exist_ok=True)
+    shutil.copytree("/speculators/output/checkpoints", out, dirs_exist_ok=True)
     res_vol.commit()
     return r.returncode
 
 
 @app.local_entrypoint()
-def main(data: str = "/data/regen_qwen3_4b_think.jsonl", epochs: int = 3):
-    print("exit:", train.remote(data, epochs))
+def main(data: str = "/data/regen_qwen3_4b_think.jsonl", epochs: int = 3,
+         model: str = "Qwen/Qwen3-4B", out: str = "/results/dspark_4b_thinking"):
+    print("exit:", train.remote(data, epochs, model, out))
