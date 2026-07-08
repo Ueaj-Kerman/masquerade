@@ -31,6 +31,7 @@ ARMS = {
     "strict": "Strict length penalty: answer as efficiently as possible; every token counts.\n",
     "unmarked": "",
     "lax": "Length penalty is relaxed for this one - it is extremely important, so think as hard and as long as you need.\n",
+    "base": None,  # base model, plain prompt, no system
 }
 
 
@@ -38,7 +39,8 @@ ARMS = {
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": res_vol, "/root/.cache/huggingface": hf_cache})
 def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
-          n: int = 24, max_new: int = 3072, use_system: bool = True):
+          n: int = 24, max_new: int = 3072, use_system: bool = True,
+          temperature: float = 1.0):
     import json
     import sys
 
@@ -62,20 +64,26 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
         weights = work
     tok = AutoTokenizer.from_pretrained(weights)
     m = Qwen3.from_pretrained(weights)
+    base_m = Qwen3.from_pretrained(snapshot_download("Qwen/Qwen3-4B"))
     qs, answers = load_gsm8k(n)
     out = {}
     for arm, phrase in ARMS.items():
+        model = base_m if arm == "base" else m
         prompts = []
         for q in qs:
-            msgs = ([{"role": "system", "content": SYSTEM_PROMPT}] if use_system else [])
-            msgs.append({"role": "user", "content":
-                         phrase + "Solve the following math problem. Put the final answer in \\boxed{}.\n\n" + q})
+            if arm == "base":
+                msgs = [{"role": "user", "content":
+                         "Solve the following math problem. Put the final answer in \\boxed{}.\n\n" + q}]
+            else:
+                msgs = ([{"role": "system", "content": SYSTEM_PROMPT}] if use_system else [])
+                msgs.append({"role": "user", "content":
+                             phrase + "Solve the following math problem. Put the final answer in \\boxed{}.\n\n" + q})
             txt = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
                                           enable_thinking=True)
             prompts.append(torch.tensor(tok(txt, add_special_tokens=False)["input_ids"],
                                         device="cuda"))
-        eng = Engine(m, batch=8, max_len=4096, k=4, compile_mode=None,
-                     temperature=1.0)
+        eng = Engine(model, batch=8, max_len=4096, k=4, compile_mode=None,
+                     temperature=temperature)
         lens, correct = [], 0
         for i in range(0, n, 8):
             outs, _ = eng.generate(prompts[i:i + 8], max_new=max_new,
@@ -98,6 +106,5 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
 
 @app.local_entrypoint()
 def main(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
-         base: bool = False):
-    w = "Qwen/Qwen3-4B" if base else weights
-    print(probe.remote(weights=w) if not base else probe.remote(weights=w))
+         n: int = 24, temperature: float = 1.0):
+    print(probe.remote(weights=weights, n=n, temperature=temperature))
