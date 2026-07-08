@@ -38,7 +38,8 @@ ARMS = {
 @app.function(image=image, gpu="H100", timeout=60 * 60 * 2,
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": res_vol, "/root/.cache/huggingface": hf_cache})
-def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
+def probe(arm: str = "all",
+          weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
           n: int = 24, max_new: int = 8192, use_system: bool = True,
           temperature: float = 1.0):
     import json
@@ -63,11 +64,12 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
         json.dump({**base_cfg, **rl_cfg}, open(work + "/config.json", "w"))
         weights = work
     tok = AutoTokenizer.from_pretrained(weights)
-    m = Qwen3.from_pretrained(weights)
-    base_m = Qwen3.from_pretrained(snapshot_download("Qwen/Qwen3-4B"))
+    todo = ARMS if arm == "all" else {arm: ARMS[arm]}
+    m = Qwen3.from_pretrained(weights) if any(a != "base" for a in todo) else None
+    base_m = Qwen3.from_pretrained(snapshot_download("Qwen/Qwen3-4B")) if "base" in todo else None
     qs, answers = load_gsm8k(n)
     out = {}
-    for arm, phrase in ARMS.items():
+    for arm, phrase in todo.items():
         model = base_m if arm == "base" else m
         prompts = []
         for q in qs:
@@ -98,7 +100,7 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
         print(json.dumps({arm: out[arm]}), flush=True)
         del eng
         torch.cuda.empty_cache()
-    with open("/results/rl_probe.json", "w") as f:
+    with open(f"/results/rl_probe_{'_'.join(todo)}.json", "w") as f:
         json.dump(out, f, indent=2)
     res_vol.commit()
     return out
@@ -106,5 +108,15 @@ def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
 
 @app.local_entrypoint()
 def main(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
-         n: int = 24, temperature: float = 1.0):
-    print(probe.remote(weights=weights, n=n, temperature=temperature))
+         n: int = 24, temperature: float = 1.0, arm: str = "all"):
+    if arm == "fan":
+        import json as _j
+        calls = [probe.spawn(arm=a, weights=weights, n=n, temperature=temperature)
+                 for a in ("strict", "unmarked", "lax", "base")]
+        for c in calls:
+            try:
+                print(_j.dumps(c.get()))
+            except Exception as e:
+                print("FAILED:", str(e)[:200])
+    else:
+        print(probe.remote(arm=arm, weights=weights, n=n, temperature=temperature))
