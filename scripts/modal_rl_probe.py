@@ -39,7 +39,7 @@ ARMS = {
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": res_vol, "/root/.cache/huggingface": hf_cache})
 def probe(weights: str = "/results/lenbudget_rl/outputs/weights/step_150",
-          n: int = 24, max_new: int = 3072, use_system: bool = True,
+          n: int = 24, max_new: int = 8192, use_system: bool = True,
           temperature: float = 1.0):
     import json
     import sys
