@@ -35,7 +35,7 @@ ARMS = {
 }
 
 
-@app.function(image=image, gpu="H100", timeout=60 * 60 * 2,
+@app.function(image=image, gpu="H200", timeout=60 * 60 * 2,
               retries=modal.Retries(max_retries=3, initial_delay=10.0),
               secrets=[modal.Secret.from_name("huggingface-secret")],
               volumes={"/results": res_vol, "/root/.cache/huggingface": hf_cache})
